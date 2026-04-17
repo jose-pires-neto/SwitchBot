@@ -124,7 +124,8 @@ LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
             response = self._client.chat.completions.create(
                 model=self._groq_model,
                 messages=messages,
-                temperature=0.1
+                temperature=0.1,
+                response_format={"type": "json_object"} # Força o modo JSON no Groq
             )
             return response.choices[0].message.content
         else:
@@ -133,6 +134,7 @@ LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
                 "model": self._ollama_model,
                 "messages": messages,
                 "stream": False,
+                "format": "json", # Força o modo JSON no Ollama
                 "options": {"temperature": 0.1}
             }
             r = req.post('http://localhost:11434/api/chat', json=payload, timeout=120)

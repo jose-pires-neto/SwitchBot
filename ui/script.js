@@ -3,32 +3,32 @@
 // ============================================================
 
 // ── Referências DOM ──
-const input       = document.getElementById('userInput');
-const sendBtn     = document.getElementById('sendBtn');
-const timeline    = document.getElementById('timeline');
-const statusDot   = document.getElementById('statusDot');
+const input = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const timeline = document.getElementById('timeline');
+const statusDot = document.getElementById('statusDot');
 const statusLabel = document.getElementById('statusLabel');
-const stopBar     = document.getElementById('stopBar');
-const stopBtn     = document.getElementById('stopBtn');
-const modelBadge  = document.getElementById('modelBadge');
+const stopBar = document.getElementById('stopBar');
+const stopBtn = document.getElementById('stopBtn');
+const modelBadge = document.getElementById('modelBadge');
 
 // Settings
-const btnSettings      = document.getElementById('btnSettings');
+const btnSettings = document.getElementById('btnSettings');
 const btnCloseSettings = document.getElementById('btnCloseSettings');
-const settingsPanel    = document.getElementById('settingsPanel');
-const settingsOverlay  = document.getElementById('settingsOverlay');
-const btnCloud         = document.getElementById('btnCloud');
-const btnLocal         = document.getElementById('btnLocal');
-const sectionCloud     = document.getElementById('sectionCloud');
-const sectionLocal     = document.getElementById('sectionLocal');
-const groqLoading      = document.getElementById('groqLoading');
-const groqModelList    = document.getElementById('groqModelList');
-const ollamaStatus     = document.getElementById('ollamaStatus');
+const settingsPanel = document.getElementById('settingsPanel');
+const settingsOverlay = document.getElementById('settingsOverlay');
+const btnCloud = document.getElementById('btnCloud');
+const btnLocal = document.getElementById('btnLocal');
+const sectionCloud = document.getElementById('sectionCloud');
+const sectionLocal = document.getElementById('sectionLocal');
+const groqLoading = document.getElementById('groqLoading');
+const groqModelList = document.getElementById('groqModelList');
+const ollamaStatus = document.getElementById('ollamaStatus');
 const installedSection = document.getElementById('installedSection');
-const installedList    = document.getElementById('installedList');
-const catalogSection   = document.getElementById('catalogSection');
-const catalogList      = document.getElementById('catalogList');
-const btnSave          = document.getElementById('btnSaveSettings');
+const installedList = document.getElementById('installedList');
+const catalogSection = document.getElementById('catalogSection');
+const catalogList = document.getElementById('catalogList');
+const btnSave = document.getElementById('btnSaveSettings');
 
 // ── Estado Global ──
 let isProcessing = false;
@@ -55,14 +55,14 @@ async function loadCurrentConfig() {
         const res = await fetch('/api/settings');
         currentConfig = await res.json();
         updateModelBadge(currentConfig);
-    } catch(e) {
+    } catch (e) {
         console.error('Erro ao carregar config:', e);
     }
 }
 
 function updateModelBadge(config) {
     if (config.provider === 'groq') {
-        const short = config.groq_model.replace('llama-', 'L').replace('-versatile','').replace('-instant','');
+        const short = config.groq_model.replace('llama-', 'L').replace('-versatile', '').replace('-instant', '');
         modelBadge.textContent = '☁️ ' + short;
     } else {
         modelBadge.textContent = '🖥️ ' + (config.ollama_model || 'local');
@@ -106,7 +106,7 @@ function playSound(type) {
         osc.connect(gain);
         gain.connect(ctx.destination);
 
-        switch(type) {
+        switch (type) {
             case 'success':
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(523, ctx.currentTime);
@@ -148,7 +148,7 @@ function playSound(type) {
                 osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.25);
                 break;
         }
-    } catch(e) {}
+    } catch (e) { }
 }
 
 // ============================================================
@@ -176,7 +176,7 @@ function createCard(type, content) {
     clearWelcome();
     const card = document.createElement('div');
 
-    switch(type) {
+    switch (type) {
         case 'user':
             card.className = 'card card-user';
             card.textContent = content;
@@ -281,6 +281,12 @@ function escapeHtml(t) {
 }
 
 function formatResponse(t) {
+    // Se a biblioteca marked estiver carregada, transforma Markdown em HTML
+    if (typeof marked !== 'undefined') {
+        marked.setOptions({ breaks: true }); // Permite quebrar linha com Enter normal
+        return marked.parse(t);
+    }
+    // Fallback original caso falhe
     return escapeHtml(t).replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
 }
 
@@ -360,7 +366,7 @@ async function handleSend(promptText) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: val })
         });
-    } catch(e) {
+    } catch (e) {
         hideStopBar();
         setStatus('error', 'Erro de conexão');
         createCard('error', 'Falha ao contatar o servidor: ' + e.message);
@@ -378,8 +384,8 @@ function openSettings() {
     settingsOverlay.classList.remove('hidden');
 
     // Copia config atual como pendente
-    pendingProvider   = currentConfig.provider;
-    pendingGroqModel  = currentConfig.groq_model;
+    pendingProvider = currentConfig.provider;
+    pendingGroqModel = currentConfig.groq_model;
     pendingOllamaModel = currentConfig.ollama_model;
 
     // Ativa o tab correto
@@ -440,7 +446,7 @@ async function loadGroqModels() {
             });
             groqModelList.appendChild(card);
         });
-    } catch(e) {
+    } catch (e) {
         groqLoading.classList.add('hidden');
         groqModelList.innerHTML = `<div style="color:#ff5252;font-size:12px;padding:8px">Erro ao carregar: ${e.message}</div>`;
     }
@@ -484,7 +490,7 @@ async function loadOllamaModels() {
         catalogList.innerHTML = '';
         data.catalog.forEach(m => renderCatalogModel(m));
 
-    } catch(e) {
+    } catch (e) {
         ollamaStatus.className = 'ollama-status offline';
         ollamaStatus.innerHTML = `⚠️ Erro ao verificar Ollama: ${e.message}`;
     }
@@ -539,16 +545,16 @@ function renderCatalogModel(m) {
             ${isRec ? '<span class="model-tag rec">⭐ Recomendado</span>' : ''}
         </div>
         <div class="model-card-desc">${m.desc}</div>
-        <button class="btn-download" id="dl-${m.name.replace(/[:. ]/g,'-')}">
+        <button class="btn-download" id="dl-${m.name.replace(/[:. ]/g, '-')}">
             ⬇️ Baixar
         </button>
-        <div class="progress-wrap hidden" id="prog-${m.name.replace(/[:. ]/g,'-')}">
+        <div class="progress-wrap hidden" id="prog-${m.name.replace(/[:. ]/g, '-')}">
             <div class="progress-bar-track">
-                <div class="progress-bar-fill" id="fill-${m.name.replace(/[:. ]/g,'-')}"></div>
+                <div class="progress-bar-fill" id="fill-${m.name.replace(/[:. ]/g, '-')}"></div>
             </div>
             <div class="progress-label">
-                <span id="prog-status-${m.name.replace(/[:. ]/g,'-')}">Iniciando...</span>
-                <span id="prog-pct-${m.name.replace(/[:. ]/g,'-')}">0%</span>
+                <span id="prog-status-${m.name.replace(/[:. ]/g, '-')}">Iniciando...</span>
+                <span id="prog-pct-${m.name.replace(/[:. ]/g, '-')}">0%</span>
             </div>
         </div>`;
 
@@ -559,11 +565,11 @@ function renderCatalogModel(m) {
 // ── Download de modelo ────────────────────────────────────
 function downloadModel(modelName) {
     const safeId = modelName.replace(/[:. ]/g, '-');
-    const dlBtn   = document.getElementById(`dl-${safeId}`);
+    const dlBtn = document.getElementById(`dl-${safeId}`);
     const progWrap = document.getElementById(`prog-${safeId}`);
-    const fill     = document.getElementById(`fill-${safeId}`);
+    const fill = document.getElementById(`fill-${safeId}`);
     const progStat = document.getElementById(`prog-status-${safeId}`);
-    const progPct  = document.getElementById(`prog-pct-${safeId}`);
+    const progPct = document.getElementById(`prog-pct-${safeId}`);
 
     if (!dlBtn) return;
 
@@ -577,8 +583,8 @@ function downloadModel(modelName) {
         const data = JSON.parse(event.data);
 
         progStat.textContent = data.status;
-        progPct.textContent  = data.percent + '%';
-        fill.style.width     = data.percent + '%';
+        progPct.textContent = data.percent + '%';
+        fill.style.width = data.percent + '%';
 
         if (data.total_gb > 0) {
             progStat.textContent = `${data.status} (${data.completed_gb}/${data.total_gb} GB)`;
@@ -637,7 +643,7 @@ async function deleteModel(modelName, cardElement) {
         } else {
             alert(`Erro ao remover: ${data.error}`);
         }
-    } catch(e) {
+    } catch (e) {
         alert(`Erro: ${e.message}`);
     }
 }
@@ -679,7 +685,7 @@ async function saveSettings() {
         } else {
             alert(`Erro ao salvar: ${data.error}`);
         }
-    } catch(e) {
+    } catch (e) {
         alert(`Erro de rede: ${e.message}`);
     } finally {
         btnSave.disabled = false;
@@ -697,7 +703,7 @@ input.addEventListener('keydown', (e) => {
 });
 
 stopBtn.addEventListener('click', async () => {
-    try { await fetch('/api/cancel', { method: 'POST' }); } catch(e) {}
+    try { await fetch('/api/cancel', { method: 'POST' }); } catch (e) { }
 });
 
 document.querySelectorAll('.chip').forEach(chip => {
