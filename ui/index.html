@@ -9,8 +9,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
-<body>
-    <!-- Header com status e controles -->
+<body class="mascot-active">
+    <!-- ======================== HEADER (SÓ APARECE NO MODO CHAT) ======================== -->
     <header class="header" id="dragArea">
         <div class="header-left">
             <div class="status-dot" id="statusDot"></div>
@@ -19,6 +19,12 @@
         </div>
         <div class="header-right">
             <span class="model-badge" id="modelBadge">—</span>
+            <button class="icon-btn" id="btnToggleMode" title="Modo Mascote">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2 12h4l2-9 5 18 3-10h6"></path>
+                </svg>
+            </button>
             <button class="icon-btn" id="btnSettings" title="Configurações">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
@@ -28,38 +34,115 @@
                     </path>
                 </svg>
             </button>
-            <span class="header-hint">Alt+O</span>
         </div>
     </header>
 
-    <!-- Timeline de Ações do Agente -->
-    <div class="timeline" id="timeline">
-        <div class="welcome-msg" id="welcomeMsg">
-            <div class="welcome-icon">🤖</div>
-            <h2>Olá! Me chamo SwitchBot.</h2>
-            <p>Digite um comando ou use os atalhos abaixo.</p>
+    <main class="main-container">
+
+        <!-- ======================== MODO MASCOTE ======================== -->
+        <div id="mascotView" class="view-mode mascot-mode">
+
+            <!-- Mascote flutuante com posição dinâmica -->
+            <div class="mascot-wrapper pos-center" id="mascotWrapper">
+
+                <!-- Controles Flutuantes (Aparecem no Hover) -->
+                <div class="mascot-controls">
+                    <button class="m-btn" id="mBtnLeft" title="Mover para Esquerda">◀</button>
+                    <button class="m-btn m-btn-chat" id="mBtnChat" title="Voltar para Chat">💬 Abrir Chat</button>
+                    <button class="m-btn" id="mBtnRight" title="Mover para Direita">▶</button>
+                </div>
+
+                <!-- Balão de Diálogo -->
+                <div class="speech-bubble hidden" id="mascotSpeechBubble">
+                    <div class="speech-content" id="mascotText">Olá! Eu sou o SwitchBot.</div>
+                    <div class="typing-indicator hidden" id="mascotTyping">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+
+                <!-- Avatar SVG Cartoon -->
+                <div class="mascot-avatar idle" id="mascotAvatar">
+                    <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="cloudGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#ffffff" />
+                                <stop offset="100%" stop-color="#d4ebff" />
+                            </linearGradient>
+                            <filter id="glow">
+                                <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+                                <feMerge>
+                                    <feMergeNode in="coloredBlur" />
+                                    <feMergeNode in="SourceGraphic" />
+                                </feMerge>
+                            </filter>
+                        </defs>
+
+                        <!-- Corpo Nuvem -->
+                        <g fill="url(#cloudGrad)" filter="url(#glow)">
+                            <circle cx="60" cy="65" r="35" />
+                            <circle cx="35" cy="55" r="22" />
+                            <circle cx="85" cy="55" r="22" />
+                            <circle cx="25" cy="75" r="15" />
+                            <circle cx="95" cy="75" r="15" />
+                            <circle cx="45" cy="85" r="18" />
+                            <circle cx="75" cy="85" r="18" />
+                            <circle cx="60" cy="40" r="25" />
+                        </g>
+
+                        <!-- Olhos com Animação de Piscar -->
+                        <g class="mascot-eyes" id="mascotEyes">
+                            <!-- Esquerdo -->
+                            <ellipse cx="45" cy="60" rx="8" ry="14" fill="#111" transform="rotate(-5, 45, 60)" />
+                            <path d="M43,53 L45,49 L47,53 L51,55 L47,57 L45,61 L43,57 L39,55 Z" fill="#fff" />
+                            <!-- Direito -->
+                            <ellipse cx="75" cy="60" rx="8" ry="14" fill="#111" transform="rotate(5, 75, 60)" />
+                            <path d="M73,53 L75,49 L77,53 L81,55 L77,57 L75,61 L73,57 L69,55 Z" fill="#fff" />
+                        </g>
+
+                        <!-- Expressão -->
+                        <path class="mascot-mouth" id="mascotMouth" d="M55,75 Q60,80 65,75" fill="none" stroke="#555"
+                            stroke-width="2.5" stroke-linecap="round" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Gamificação: Barra de XP (Placeholder) -->
+            <div class="xp-container" id="xpContainer">
+                <div class="xp-header">
+                    <span class="xp-level">Nível 1</span>
+                    <span class="xp-title">SwitchBot Aprendiz</span>
+                </div>
+                <div class="xp-bar">
+                    <div class="xp-fill" style="width: 15%;"></div>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <!-- Botão de STOP (aparece durante processamento) -->
+        <!-- ======================== MODO CHAT (CLÁSSICO) ======================== -->
+        <div id="chatView" class="view-mode chat-mode hidden">
+            <div class="timeline" id="timeline">
+                <div class="welcome-msg" id="welcomeMsg">
+                    <div class="welcome-icon">🤖</div>
+                    <h2>Modo Desenvolvedor</h2>
+                    <p>Histórico completo de ações e pensamentos.</p>
+                </div>
+            </div>
+
+            <div class="quick-actions" id="quickActions">
+                <button class="chip" data-prompt="Pesquise na internet sobre ">🔍 Pesquisar</button>
+                <button class="chip" data-prompt="Abra o programa ">📂 Abrir App</button>
+                <button class="chip" data-prompt="Execute no terminal: ">💻 Terminal</button>
+            </div>
+        </div>
+    </main>
+
     <div class="stop-bar hidden" id="stopBar">
-        <button class="stop-btn" id="stopBtn">
-            <span class="stop-icon">■</span>
-            Parar Tarefa
-        </button>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="quick-actions" id="quickActions">
-        <button class="chip" data-prompt="Pesquise na internet sobre ">🔍 Pesquisar</button>
-        <button class="chip" data-prompt="Abra o programa ">📂 Abrir App</button>
-        <button class="chip" data-prompt="Execute no terminal: ">💻 Terminal</button>
-        <button class="chip" data-prompt="Leia o site ">🌐 Ler Site</button>
+        <button class="stop-btn" id="stopBtn"><span class="stop-icon">■</span> Parar Tarefa</button>
     </div>
 
     <!-- Input Area -->
-    <div class="input-area">
-        <input type="text" id="userInput" placeholder="Peça algo ao Jarvis..." autocomplete="off" autofocus>
+    <div class="input-area" id="inputArea">
+        <input type="text" id="userInput" placeholder="O que vamos fazer agora?" autocomplete="off" autofocus>
         <button id="sendBtn" title="Enviar">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -69,64 +152,41 @@
         </button>
     </div>
 
-    <!-- ======================== PAINEL DE CONFIGURAÇÕES ======================== -->
+    <!-- PAINEL DE CONFIGURAÇÕES -->
     <div class="settings-overlay hidden" id="settingsOverlay"></div>
     <div class="settings-panel hidden" id="settingsPanel">
-
-        <!-- Header do painel -->
         <div class="settings-header">
-            <span>⚙️ Configurações de Modelo</span>
+            <span>⚙️ Configurações</span>
             <button class="icon-btn" id="btnCloseSettings">✕</button>
         </div>
-
-        <!-- Toggle Cloud / Local -->
         <div class="provider-toggle">
-            <button class="provider-btn active" id="btnCloud" data-provider="groq">
-                ☁️ Cloud (Groq)
-            </button>
-            <button class="provider-btn" id="btnLocal" data-provider="ollama">
-                🖥️ Local (Ollama)
-            </button>
+            <button class="provider-btn active" id="btnCloud" data-provider="groq">☁️ Cloud</button>
+            <button class="provider-btn" id="btnLocal" data-provider="ollama">🖥️ Local</button>
         </div>
-
-        <!-- ── SEÇÃO CLOUD ── -->
         <div class="provider-section" id="sectionCloud">
-            <p class="section-desc">Modelos hospedados na Groq. Rápidos, sem ocupar espaço local. Requer conexão com a
-                internet.</p>
             <div class="models-loading" id="groqLoading">
-                <div class="mini-spinner"></div> Carregando modelos...
+                <div class="mini-spinner"></div> Carregando...
             </div>
             <div class="model-list" id="groqModelList"></div>
         </div>
-
-        <!-- ── SEÇÃO LOCAL ── -->
         <div class="provider-section hidden" id="sectionLocal">
-
-            <!-- Status do Ollama -->
             <div class="ollama-status" id="ollamaStatus">
                 <div class="mini-spinner"></div> Verificando Ollama...
             </div>
-
-            <!-- Modelos instalados -->
             <div id="installedSection" class="hidden">
                 <h4 class="section-title">Instalados</h4>
                 <div class="model-list" id="installedList"></div>
             </div>
-
-            <!-- Catálogo para download -->
             <div id="catalogSection" class="hidden">
-                <h4 class="section-title">Disponíveis para Download</h4>
+                <h4 class="section-title">Para Download</h4>
                 <div class="model-list" id="catalogList"></div>
             </div>
         </div>
-
-        <!-- Footer com botão Salvar -->
         <div class="settings-footer">
             <button class="save-btn" id="btnSaveSettings">✓ Aplicar Configuração</button>
         </div>
     </div>
 
-    <!-- Biblioteca Marked.js para renderizar Markdown nas respostas -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="script.js"></script>
 </body>

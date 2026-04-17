@@ -1,21 +1,11 @@
 """
 model_manager.py — Gerencia provedores de IA (Groq Cloud + Ollama Local)
-
-Responsabilidades:
-- Carregar e salvar config.json
-- Listar modelos disponíveis no Groq
-- Verificar status do Ollama
-- Listar modelos Ollama instalados
-- Download de modelos com streaming de progresso
-- Deleção de modelos
 """
 
 import os
 import json
 import requests
-import threading
 
-# ======================== CONFIG ========================
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
 
 DEFAULT_CONFIG = {
@@ -24,15 +14,42 @@ DEFAULT_CONFIG = {
     "ollama_model": None
 }
 
+# Catálogo curado para dar nomes bonitos e descrições na UI aos modelos Groq
+GROQ_CATALOG_INFO = {
+    "llama-3.3-70b-versatile": {
+        "label": "Llama 3.3 · 70B",
+        "desc": "Modelo extremamente capaz e inteligente. Ideal como cérebro principal do agente.",
+        "tags": ["recomendado", "avançado"]
+    },
+    "llama-3.1-8b-instant": {
+        "label": "Llama 3.1 · 8B",
+        "desc": "Muito rápido. Bom para respostas curtas, mas pode falhar em automações complexas.",
+        "tags": ["rápido"]
+    },
+    "deepseek-r1-distill-llama-70b": {
+        "label": "DeepSeek R1 · 70B",
+        "desc": "Focado em raciocínio lógico profundo e criação de código.",
+        "tags": ["raciocínio", "código"]
+    },
+    "mixtral-8x7b-32768": {
+        "label": "Mixtral 8x7B",
+        "desc": "Poderoso modelo MoE da Mistral. Ótimo contexto longo.",
+        "tags": ["contexto amplo"]
+    },
+    "gemma2-9b-it": {
+        "label": "Gemma 2 · 9B",
+        "desc": "Modelo leve e eficiente do Google.",
+        "tags": ["google"]
+    }
+}
+
 def load_config() -> dict:
-    """Lê config.json, criando com valores padrão se não existir."""
     if not os.path.exists(CONFIG_PATH):
         save_config(DEFAULT_CONFIG)
         return DEFAULT_CONFIG.copy()
     try:
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            # Garante que campos obrigatórios existam
             for k, v in DEFAULT_CONFIG.items():
                 if k not in data:
                     data[k] = v
@@ -41,22 +58,15 @@ def load_config() -> dict:
         return DEFAULT_CONFIG.copy()
 
 def save_config(data: dict):
-    """Persiste a configuração no config.json."""
     with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
 # ======================== GROQ ========================
 
-# Modelos que NÃO são de chat/texto (whisper, tts, guard, etc.)
-_GROQ_SKIP_PREFIXES = ('whisper', 'distil-whisper', 'playai', 'llama-guard',
-                        'llama3-groq', 'gemma2', 'allam')
+_GROQ_SKIP_PREFIXES = ('whisper', 'distil-whisper', 'playai', 'llama-guard')
 
 def get_groq_models(api_key: str) -> list[dict]:
-    """
-    Retorna lista de modelos de chat disponíveis no Groq.
-    Filtra modelos de áudio/guard/embedding.
-    """
     try:
         from groq import Groq
         client = Groq(api_key=api_key)
@@ -66,12 +76,18 @@ def get_groq_models(api_key: str) -> list[dict]:
             mid = m.id.lower()
             if any(mid.startswith(p) for p in _GROQ_SKIP_PREFIXES):
                 continue
+            
+            # Pega infos do catálogo interno se existir
+            info = GROQ_CATALOG_INFO.get(m.id, {})
+            
             models.append({
                 "id": m.id,
-                "owned_by": getattr(m, 'owned_by', 'Meta'),
-                "context": _groq_context_hint(m.id)
+                "label": info.get("label", m.id),
+                "desc": info.get("desc", "Modelo de linguagem padrão."),
+                "tags": info.get("tags", ["128k ctx"]),
+                "owned_by": getattr(m, 'owned_by', 'Desconhecido')
             })
-        # Ordena: mais capazes primeiro
+            
         models.sort(key=lambda x: (
             '70b' not in x['id'],
             '8b' not in x['id'],
@@ -80,20 +96,6 @@ def get_groq_models(api_key: str) -> list[dict]:
         return models
     except Exception as e:
         return [{"error": str(e)}]
-
-def _groq_context_hint(model_id: str) -> str:
-    """Retorna dica de contexto baseada no nome do modelo."""
-    lid = model_id.lower()
-    if '70b' in lid or '405b' in lid:
-        return '128k ctx · Rápido e poderoso'
-    if '8b' in lid:
-        return '128k ctx · Ultrarrápido'
-    if 'compound' in lid:
-        return 'Agente multi-step'
-    if 'deepseek' in lid:
-        return 'Raciocínio avançado'
-    return '128k ctx'
-
 
 # ======================== OLLAMA ========================
 

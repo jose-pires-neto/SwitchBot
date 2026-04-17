@@ -1,14 +1,5 @@
 """
 jarvis_core.py — Motor de IA do SwitchBot
-
-Suporta dois provedores:
-  - Groq (Cloud): modelos llama, deepseek, etc.
-  - Ollama (Local): qualquer modelo instalado
-
-Memória persistente via SQLite (memory.py):
-  - Cada sessão de uso é salva com histórico de mensagens
-  - Fatos e preferências do usuário sobrevivem entre sessões
-  - Contexto resumido é injetado no system prompt automaticamente
 """
 
 import os
@@ -25,14 +16,10 @@ class JarvisCore:
         load_dotenv()
         self._cancel_event = threading.Event()
         self._lock = threading.Lock()
-        
-        # Inicia nova sessão de memória
         self._session_id = memory.create_session()
-        
         self._load_provider()
 
     def _load_provider(self):
-        """Instancia o client correto baseado no config.json."""
         config = model_manager.load_config()
         self._provider   = config.get('provider', 'groq')
         self._groq_model = config.get('groq_model', 'llama-3.3-70b-versatile')
@@ -45,20 +32,17 @@ class JarvisCore:
             from groq import Groq
             self._client = Groq(api_key=api_key)
         else:
-            self._client = None  # Ollama via HTTP
+            self._client = None
 
-        # Reconstrói o histórico em memória com o system prompt atualizado
         self._messages = [
             {"role": "system", "content": self._build_system_prompt()}
         ]
 
     def reload_config(self):
-        """Recarrega provedor/modelo sem reiniciar o processo."""
         with self._lock:
             self._load_provider()
 
     def _build_system_prompt(self) -> str:
-        """Monta o system prompt com skills + contexto de memória persistente."""
         skills = skill_manager.get_available_skills()
         skills_json = json.dumps(skills, indent=2, ensure_ascii=False)
         provider_hint = (
@@ -67,65 +51,59 @@ class JarvisCore:
             else f"Ollama Local ({self._ollama_model})"
         )
         
-        # Injeta contexto de memória (fatos + resumo da última sessão)
         memory_context = memory.get_context_summary()
-        memory_block = ""
-        if memory_context:
-            memory_block = f"\n\n{memory_context}\n"
+        memory_block = f"\n\n{memory_context}\n" if memory_context else ""
 
         return f"""Você é uma IA autônoma rodando localmente no Windows. Provedor: {provider_hint}.
 Seu objetivo é ajudar o usuário interagindo com o PC através de skills Python.
 {memory_block}
 CATÁLOGO DE SKILLS DISPONÍVEIS:
-Use skills existentes sempre que possível. NÃO crie skills duplicadas!
+Use skills existentes sempre que possível. Preste atenção aos 'parametros_esperados' de cada skill e passe-os no objeto 'args'.
 {skills_json}
 
 REGRAS DE RESPOSTA (ESTRITAMENTE OBRIGATÓRIO):
-Responda SEMPRE com UM ÚNICO bloco JSON válido. Nenhum texto fora do JSON!
+Responda SEMPRE com UM ÚNICO bloco JSON válido. NENHUM texto antes ou depois do JSON.
 
 Formatos aceitos:
 
 1. Mensagem ao usuário:
 {{
-  "thought": "Raciocínio rápido.",
+  "thought": "O que vou dizer e porquê.",
   "action": "message",
-  "text": "Sua resposta."
+  "text": "Sua resposta formatada."
 }}
 
 2. Executar skill existente:
 {{
-  "thought": "Por que uso esta skill e com quais argumentos.",
+  "thought": "Vou usar a skill X porque...",
   "action": "execute_skill",
-  "skill_name": "nome_exato_da_skill",
-  "args": {{"param": "valor"}}
+  "skill_name": "nome_exato",
+  "args": {{"parametro1": "valor"}}
 }}
 
-3. Criar nova skill (somente se não houver alternativa):
+3. Criar nova skill (apenas se for estritamente necessário):
 {{
-  "thought": "Justificativa forte.",
+  "thought": "Preciso de uma nova skill para...",
   "action": "create_skill",
-  "skill_name": "nome_unico",
-  "code": "\\\"\\\"\\\"Docstring obrigatória\\\"\\\"\\\"\\nimport os\\n\\ndef run(**kwargs):\\n    return 'resultado'"
+  "skill_name": "nome_sem_espacos",
+  "code": "import os\\n\\ndef run(**kwargs):\\n    return 'resultado'"
 }}
 
-4. Salvar fato/preferência do usuário na memória permanente:
+4. Salvar fato na memória (preferências, senhas, etc):
 {{
-  "thought": "O usuário mencionou algo importante para lembrar.",
+  "thought": "Usuário quer que eu lembre disso.",
   "action": "save_fact",
-  "key": "chave_descritiva",
-  "value": "valor a lembrar"
-}}
-
-LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
+  "key": "assunto",
+  "value": "detalhe"
+}}"""
 
     def _chat_completion(self, messages: list) -> str:
-        """Abstração única de chat para Groq ou Ollama."""
         if self._provider == 'groq':
             response = self._client.chat.completions.create(
                 model=self._groq_model,
                 messages=messages,
                 temperature=0.1,
-                response_format={"type": "json_object"} # Força o modo JSON no Groq
+                response_format={"type": "json_object"}
             )
             return response.choices[0].message.content
         else:
@@ -134,7 +112,7 @@ LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
                 "model": self._ollama_model,
                 "messages": messages,
                 "stream": False,
-                "format": "json", # Força o modo JSON no Ollama
+                "format": "json",
                 "options": {"temperature": 0.1}
             }
             r = req.post('http://localhost:11434/api/chat', json=payload, timeout=120)
@@ -142,13 +120,23 @@ LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
             return r.json()['message']['content']
 
     def _parse_json_response(self, text: str) -> dict:
+        """
+        Extrator de JSON à prova de balas.
+        Ignora textos antes e depois, buscando a raiz do objeto JSON.
+        """
         try:
-            match = re.search(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL)
-            if match:
-                return json.loads(match.group(1))
+            # Tenta encontrar o primeiro { e o último }
+            start_idx = text.find('{')
+            end_idx = text.rfind('}')
+            
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                json_str = text[start_idx:end_idx+1]
+                return json.loads(json_str)
+            
+            # Fallback direto
             return json.loads(text)
-        except json.JSONDecodeError:
-            return {"action": "error", "message": "JSON inválido na resposta da IA."}
+        except json.JSONDecodeError as e:
+            return {"action": "error", "message": f"Falha ao interpretar resposta da IA como JSON. Resposta bruta: {text[:100]}..."}
 
     def cancel(self):
         self._cancel_event.set()
@@ -157,16 +145,8 @@ LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
         return self._cancel_event.is_set()
 
     def process_input(self, user_input: str, progress_callback=None) -> str:
-        """
-        Processa entrada do usuário com Chain of Thought.
-        Persiste todas as mensagens no SQLite automaticamente.
-        """
         self._cancel_event.clear()
-        
-        # Atualiza system prompt com memória mais recente
         self._messages[0]["content"] = self._build_system_prompt()
-        
-        # Adiciona e persiste a mensagem do usuário
         self._messages.append({"role": "user", "content": user_input})
         memory.save_message(self._session_id, "user", user_input)
 
@@ -174,7 +154,6 @@ LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
 
         for _ in range(max_iterations):
             if self.is_cancelled():
-                memory.save_message(self._session_id, "system", "Tarefa cancelada pelo usuário.")
                 return "⏹️ Tarefa cancelada."
 
             try:
@@ -193,13 +172,11 @@ LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
 
                 action = data.get("action")
 
-                # ── MESSAGE ───────────────────────────────
                 if action == "message":
                     result_text = data.get("text", "")
                     memory.save_message(self._session_id, "assistant", result_text)
                     return result_text
 
-                # ── EXECUTE SKILL ─────────────────────────
                 elif action == "execute_skill":
                     skill_name = data.get("skill_name")
                     args = data.get("args", {})
@@ -207,7 +184,6 @@ LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
                         progress_callback("executing", f"Skill: {skill_name}")
 
                     result = skill_manager.execute_skill(skill_name, args)
-
                     if self.is_cancelled():
                         return "⏹️ Tarefa cancelada."
 
@@ -216,7 +192,6 @@ LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
                         "content": f"Resultado de '{skill_name}':\n{result}\nO que você responde agora?"
                     })
 
-                # ── CREATE SKILL ──────────────────────────
                 elif action == "create_skill":
                     skill_name = data.get("skill_name")
                     code = data.get("code")
@@ -226,10 +201,9 @@ LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
                     result = skill_manager.create_skill(skill_name, code)
                     self._messages.append({
                         "role": "user",
-                        "content": f"Sistema: {result}. Se sucesso, execute-a ou responda."
+                        "content": f"Sistema: {result}. Se sucesso, execute-a. Se houver erro de sintaxe, corrija e crie novamente."
                     })
 
-                # ── SAVE FACT (memória permanente) ─────────
                 elif action == "save_fact":
                     key   = data.get("key", "")
                     value = data.get("value", "")
@@ -239,23 +213,15 @@ LEMBRE-SE: Retorne apenas JSON. Sem markdown ou texto livre."""
                             progress_callback("executing", f"Memorizando: {key}")
                         self._messages.append({
                             "role": "user",
-                            "content": f"Sistema: Fato '{key}' memorizado com sucesso. Confirme ao usuário."
+                            "content": f"Sistema: Fato '{key}' memorizado."
                         })
                     else:
-                        self._messages.append({
-                            "role": "user",
-                            "content": "Erro: save_fact requer 'key' e 'value'. Corrija e tente novamente."
-                        })
+                        self._messages.append({"role": "user", "content": "Erro: save_fact requer 'key' e 'value'."})
 
                 else:
-                    self._messages.append({
-                        "role": "user",
-                        "content": "Ação desconhecida ou JSON inválido. Corrija o formato."
-                    })
+                    self._messages.append({"role": "user", "content": "Ação desconhecida ou erro no JSON. Certifique-se de usar apenas as actions permitidas."})
 
             except Exception as e:
-                error_msg = f"Erro de comunicação: {str(e)}"
-                memory.save_message(self._session_id, "system", error_msg)
-                return error_msg
+                return f"Erro de comunicação: {str(e)}"
 
-        return "⚠️ Limite de iterações atingido. O agente foi interrompido para evitar loop."
+        return "⚠️ Limite de iterações atingido. O agente parou para evitar loop infinito."
