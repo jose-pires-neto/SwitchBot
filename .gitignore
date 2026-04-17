@@ -1,0 +1,32 @@
+# === Segredos ===
+.env
+.env.*
+
+# === Python Cache ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# === Virtual Environment ===
+venv/
+.venv/
+env/
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === OS ===
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# === Skills geradas dinamicamente (opcionais) ===
+# Descomente a linha abaixo se quiser ignorar skills criadas pelo agente
+# skills/*.py
+# !skills/shell_executor.py
+# !skills/web_search.py
+# !skills/leitor_sites.py

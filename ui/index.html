@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis Command Center</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Header com status e controles -->
+    <header class="header" id="dragArea">
+        <div class="header-left">
+            <div class="status-dot" id="statusDot"></div>
+            <span class="header-title">Jarvis</span>
+            <span class="status-label" id="statusLabel">Online</span>
+        </div>
+        <div class="header-right">
+            <span class="header-hint">Alt+O</span>
+        </div>
+    </header>
+
+    <!-- Timeline de Ações do Agente -->
+    <div class="timeline" id="timeline">
+        <div class="welcome-msg">
+            <div class="welcome-icon">🤖</div>
+            <h2>Olá! Sou o Jarvis.</h2>
+            <p>Seu agente autônomo local. Digite um comando ou use os atalhos abaixo.</p>
+        </div>
+    </div>
+
+    <!-- Botão de STOP (aparece durante processamento) -->
+    <div class="stop-bar hidden" id="stopBar">
+        <button class="stop-btn" id="stopBtn">
+            <span class="stop-icon">■</span>
+            Parar Tarefa
+        </button>
+        <span class="stop-hint">O agente será interrompido</span>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions" id="quickActions">
+        <button class="chip" data-prompt="Pesquise na internet sobre ">🔍 Pesquisar</button>
+        <button class="chip" data-prompt="Abra o programa ">📂 Abrir App</button>
+        <button class="chip" data-prompt="Execute no terminal: ">💻 Terminal</button>
+        <button class="chip" data-prompt="Leia o site ">🌐 Ler Site</button>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="Peça algo ao Jarvis..." autocomplete="off" autofocus>
+        <button id="sendBtn" title="Enviar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+        </button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
