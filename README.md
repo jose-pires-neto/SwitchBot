@@ -2,6 +2,8 @@
 
 O **SwitchBot** é um Agente de Inteligência Artificial (Agentic AI) projetado para rodar localmente no seu computador (Windows). Mais do que apenas conversar, o SwitchBot pode **agir** no seu sistema através de *Skills* (habilidades) escritas em Python, funcionando como um verdadeiro assistente pessoal que executa tarefas por você.
 
+<img width="1500" height="500" alt="Image" src="https://github.com/user-attachments/assets/4d6a7319-6a33-4fa0-bf68-2a7c4b72b627" />
+
 ## 
 
 ## **Funcionalidades Principais**
