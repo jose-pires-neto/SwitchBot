@@ -1,3 +1,18 @@
+"""
+main.py — Servidor Flask do SwitchBot
+
+Rotas:
+  / e /ui/*           → Serve os arquivos da UI
+  /api/send           → Envia prompt ao JarvisCore
+  /api/cancel         → Cancela tarefa em andamento
+  /api/events         → SSE: feedback em tempo real
+  /api/settings       → GET/POST configuração do modelo
+  /api/models/groq    → Lista modelos disponíveis no Groq
+  /api/models/ollama  → Status + instalados + catálogo
+  /api/models/pull    → SSE: download de modelo Ollama
+  /api/models/delete  → Remove modelo Ollama
+"""
+
 import os
 import sys
 import json
@@ -10,39 +25,44 @@ import time
 from flask import Flask, send_from_directory, request, Response, jsonify
 import keyboard
 from jarvis_core import JarvisCore
+import model_manager
 
-# ======================== FLASK SERVER ========================
+# ======================== FLASK + CORE ========================
 app = Flask(__name__)
 core = JarvisCore()
-
-# Fila global de eventos SSE (um único usuário local)
 sse_queue = queue.Queue()
+
+UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui')
 
 @app.route('/')
 def index():
-    ui_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui')
-    return send_from_directory(ui_dir, 'index.html')
+    return send_from_directory(UI_DIR, 'index.html')
 
 @app.route('/<path:path>')
 def static_files(path):
-    ui_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui')
-    return send_from_directory(ui_dir, path)
+    return send_from_directory(UI_DIR, path)
 
+# ======================== CHAT ========================
 @app.route('/api/send', methods=['POST'])
 def send_prompt():
     data = request.get_json()
-    user_text = data.get('text', '')
-    
+    user_text = data.get('text', '').strip()
+    if not user_text:
+        return jsonify({"ok": False, "error": "Texto vazio"}), 400
+
     def progress(msg_type, text):
-        sse_queue.put(json.dumps({"type": "feedback", "msg_type": msg_type, "text": text}, ensure_ascii=False))
-    
+        sse_queue.put(json.dumps(
+            {"type": "feedback", "msg_type": msg_type, "text": text},
+            ensure_ascii=False
+        ))
+
     def process():
         try:
             result = core.process_input(user_text, progress_callback=progress)
             sse_queue.put(json.dumps({"type": "response", "text": result}, ensure_ascii=False))
         except Exception as e:
             sse_queue.put(json.dumps({"type": "response", "text": f"Erro: {str(e)}"}, ensure_ascii=False))
-    
+
     threading.Thread(target=process, daemon=True).start()
     return jsonify({"ok": True})
 
@@ -53,18 +73,17 @@ def cancel_task():
 
 @app.route('/api/events')
 def events():
-    """Server-Sent Events stream para feedback em tempo real."""
+    """SSE: stream de feedback em tempo real para a UI."""
     def generate():
         while True:
             try:
                 data = sse_queue.get(timeout=25)
                 yield f"data: {data}\n\n"
             except queue.Empty:
-                # Heartbeat para manter a conexão viva
                 yield f"data: {json.dumps({'type': 'ping'})}\n\n"
-    
+
     return Response(
-        generate(), 
+        generate(),
         mimetype='text/event-stream',
         headers={
             'Cache-Control': 'no-cache',
@@ -73,93 +92,159 @@ def events():
         }
     )
 
-# ======================== WINDOW CONTROL (Win32 API) ========================
+# ======================== SETTINGS ========================
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    config = model_manager.load_config()
+    return jsonify(config)
+
+@app.route('/api/settings', methods=['POST'])
+def save_settings():
+    data = request.get_json()
+    config = model_manager.load_config()
+    
+    if 'provider' in data:
+        config['provider'] = data['provider']
+    if 'groq_model' in data:
+        config['groq_model'] = data['groq_model']
+    if 'ollama_model' in data:
+        config['ollama_model'] = data['ollama_model']
+    
+    model_manager.save_config(config)
+    
+    # Recarrega o core com o novo provedor sem reiniciar
+    try:
+        core.reload_config()
+        return jsonify({"ok": True, "config": config})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+# ======================== MODELOS GROQ ========================
+@app.route('/api/models/groq', methods=['GET'])
+def list_groq_models():
+    from dotenv import load_dotenv
+    load_dotenv()
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return jsonify({"error": "GROQ_API_KEY não configurada"}), 500
+
+    models = model_manager.get_groq_models(api_key)
+    return jsonify({"models": models})
+
+# ======================== MODELOS OLLAMA ========================
+@app.route('/api/models/ollama', methods=['GET'])
+def list_ollama_models():
+    status = model_manager.get_ollama_full_status()
+    return jsonify(status)
+
+@app.route('/api/models/pull')
+def pull_model():
+    """SSE: stream de progresso do download de um modelo Ollama."""
+    model_name = request.args.get('model', '')
+    if not model_name:
+        return jsonify({"error": "Parâmetro 'model' obrigatório"}), 400
+
+    def generate():
+        for progress in model_manager.pull_model_stream(model_name):
+            yield f"data: {json.dumps(progress, ensure_ascii=False)}\n\n"
+        # Confirma fim do stream
+        yield f"data: {json.dumps({'done': True, 'status': 'success'})}\n\n"
+
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no'
+        }
+    )
+
+@app.route('/api/models/delete', methods=['POST'])
+def delete_model():
+    data = request.get_json()
+    model_name = data.get('model', '')
+    if not model_name:
+        return jsonify({"error": "Parâmetro 'model' obrigatório"}), 400
+
+    result = model_manager.delete_ollama_model(model_name)
+    return jsonify(result)
+
+# ======================== WINDOW CONTROL ========================
 WINDOW_TITLE = "Jarvis Command Center"
 
 def find_window():
-    """Encontra o handle da janela do Edge em modo app pelo título."""
     return ctypes.windll.user32.FindWindowW(None, WINDOW_TITLE)
 
 def toggle_overlay():
-    """Alt+O: esconde ou mostra a janela do Jarvis."""
     hwnd = find_window()
     if hwnd:
         if ctypes.windll.user32.IsWindowVisible(hwnd):
-            ctypes.windll.user32.ShowWindow(hwnd, 0)  # SW_HIDE
+            ctypes.windll.user32.ShowWindow(hwnd, 0)   # SW_HIDE
         else:
-            ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            ctypes.windll.user32.ShowWindow(hwnd, 9)   # SW_RESTORE
             ctypes.windll.user32.SetForegroundWindow(hwnd)
 
 def set_always_on_top(hwnd):
-    """Coloca a janela sempre no topo."""
     HWND_TOPMOST = ctypes.wintypes.HWND(-1)
     SWP_NOMOVE = 0x0002
     SWP_NOSIZE = 0x0001
     ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
 
 def open_app_window(port):
-    """Abre Edge ou Chrome em modo --app (frameless, sem barra de URL)."""
     url = f'http://localhost:{port}'
-    
-    # Tenta Edge primeiro (vem com Windows 10/11)
     edge_paths = [
         os.path.expandvars(r'%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe'),
         os.path.expandvars(r'%ProgramFiles%\Microsoft\Edge\Application\msedge.exe'),
     ]
-    
-    # Fallback para Chrome
     chrome_paths = [
         os.path.expandvars(r'%ProgramFiles%\Google\Chrome\Application\chrome.exe'),
         os.path.expandvars(r'%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe'),
         os.path.expandvars(r'%LocalAppData%\Google\Chrome\Application\chrome.exe'),
     ]
-    
     browser = None
     for p in edge_paths + chrome_paths:
         if os.path.exists(p):
             browser = p
             break
-    
+
     if browser:
-        subprocess.Popen([browser, f'--app={url}', '--window-size=650,520', '--disable-extensions'])
+        subprocess.Popen([browser, f'--app={url}', '--window-size=700,580', '--disable-extensions'])
     else:
-        # Último recurso: abre no navegador padrão
         import webbrowser
         webbrowser.open(url)
-    
-    # Espera a janela aparecer e aplica always-on-top
+
     def apply_on_top():
-        for _ in range(30):  # Tenta por 15 segundos
+        for _ in range(30):
             time.sleep(0.5)
             hwnd = find_window()
             if hwnd:
                 set_always_on_top(hwnd)
-                print("✅ Janela detectada e fixada como always-on-top.")
                 break
-    
+
     threading.Thread(target=apply_on_top, daemon=True).start()
 
 # ======================== MAIN ========================
 if __name__ == '__main__':
     PORT = 5789
-    
-    print("=" * 50)
-    print("  🤖 JARVIS COMMAND CENTER")
-    print("=" * 50)
-    print(f"  Servidor local: http://localhost:{PORT}")
-    print("  Atalho global:  Alt+O (mostrar/esconder)")
-    print("  Para encerrar:  Ctrl+C no terminal")
-    print("=" * 50)
-    
-    # Registra hotkey global
+    config = model_manager.load_config()
+
+    print("=" * 52)
+    print("  🤖 SWITCHBOT — Command Center")
+    print("=" * 52)
+    print(f"  Provedor : {config['provider'].upper()}")
+    if config['provider'] == 'groq':
+        print(f"  Modelo   : {config['groq_model']}")
+    else:
+        print(f"  Modelo   : {config.get('ollama_model', 'não configurado')}")
+    print(f"  UI       : http://localhost:{PORT}")
+    print("  Atalho   : Alt+O (mostrar/esconder)")
+    print("=" * 52)
+
     keyboard.add_hotkey('alt+o', toggle_overlay)
-    
-    # Abre a janela do navegador em modo app após o servidor subir
     threading.Timer(1.5, lambda: open_app_window(PORT)).start()
-    
-    # Inicia o Flask (sem logs poluindo o terminal)
+
     import logging
-    log = logging.getLogger('werkzeug')
-    log.setLevel(logging.ERROR)
-    
+    logging.getLogger('werkzeug').setLevel(logging.ERROR)
+
     app.run(host='127.0.0.1', port=PORT, debug=False, threaded=True)

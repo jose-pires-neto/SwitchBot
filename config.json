@@ -1,0 +1,5 @@
+{
+    "provider": "ollama",
+    "groq_model": "llama-3.3-70b-versatile",
+    "ollama_model": "qwen2.5-coder:1.5b"
+}

@@ -18,13 +18,20 @@
             <span class="status-label" id="statusLabel">Online</span>
         </div>
         <div class="header-right">
+            <span class="model-badge" id="modelBadge">—</span>
+            <button class="icon-btn" id="btnSettings" title="Configurações">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+            </button>
             <span class="header-hint">Alt+O</span>
         </div>
     </header>
 
     <!-- Timeline de Ações do Agente -->
     <div class="timeline" id="timeline">
-        <div class="welcome-msg">
+        <div class="welcome-msg" id="welcomeMsg">
             <div class="welcome-icon">🤖</div>
             <h2>Olá! Sou o Jarvis.</h2>
             <p>Seu agente autônomo local. Digite um comando ou use os atalhos abaixo.</p>
@@ -58,6 +65,62 @@
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
             </svg>
         </button>
+    </div>
+
+    <!-- ======================== PAINEL DE CONFIGURAÇÕES ======================== -->
+    <div class="settings-overlay hidden" id="settingsOverlay"></div>
+    <div class="settings-panel hidden" id="settingsPanel">
+        
+        <!-- Header do painel -->
+        <div class="settings-header">
+            <span>⚙️ Configurações de Modelo</span>
+            <button class="icon-btn" id="btnCloseSettings">✕</button>
+        </div>
+
+        <!-- Toggle Cloud / Local -->
+        <div class="provider-toggle">
+            <button class="provider-btn active" id="btnCloud" data-provider="groq">
+                ☁️ Cloud (Groq)
+            </button>
+            <button class="provider-btn" id="btnLocal" data-provider="ollama">
+                🖥️ Local (Ollama)
+            </button>
+        </div>
+
+        <!-- ── SEÇÃO CLOUD ── -->
+        <div class="provider-section" id="sectionCloud">
+            <p class="section-desc">Modelos hospedados na Groq. Rápidos, sem ocupar espaço local. Requer conexão com a internet.</p>
+            <div class="models-loading" id="groqLoading">
+                <div class="mini-spinner"></div> Carregando modelos...
+            </div>
+            <div class="model-list" id="groqModelList"></div>
+        </div>
+
+        <!-- ── SEÇÃO LOCAL ── -->
+        <div class="provider-section hidden" id="sectionLocal">
+
+            <!-- Status do Ollama -->
+            <div class="ollama-status" id="ollamaStatus">
+                <div class="mini-spinner"></div> Verificando Ollama...
+            </div>
+
+            <!-- Modelos instalados -->
+            <div id="installedSection" class="hidden">
+                <h4 class="section-title">Instalados</h4>
+                <div class="model-list" id="installedList"></div>
+            </div>
+
+            <!-- Catálogo para download -->
+            <div id="catalogSection" class="hidden">
+                <h4 class="section-title">Disponíveis para Download</h4>
+                <div class="model-list" id="catalogList"></div>
+            </div>
+        </div>
+
+        <!-- Footer com botão Salvar -->
+        <div class="settings-footer">
+            <button class="save-btn" id="btnSaveSettings">✓ Aplicar Configuração</button>
+        </div>
     </div>
 
     <script src="script.js"></script>
