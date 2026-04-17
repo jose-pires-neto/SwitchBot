@@ -178,7 +178,8 @@ def get_ollama_installed() -> list[dict]:
             return [
                 {
                     "name": m['name'],
-                    "size_gb": round(m.get('size', 0) / (1024**3), 1)
+                    # Usa "or 0" para evitar erro se "size" vier como None
+                    "size_gb": round((m.get('size') or 0) / (1024**3), 1)
                 }
                 for m in models
             ]
@@ -196,18 +197,21 @@ def pull_model_stream(model_name: str):
         
         for progress in ollama.pull(model_name, stream=True):
             status = progress.get('status', '')
-            total = progress.get('total', 0)
-            completed = progress.get('completed', 0)
+            
+            # Correção principal:
+            # Substitui 'None' por '0' caso o Ollama retorne um status vazio
+            total = progress.get('total') or 0
+            completed = progress.get('completed') or 0
             
             percent = 0
-            if total and total > 0:
+            if total > 0:
                 percent = round((completed / total) * 100, 1)
             
             yield {
                 "status": status,
                 "percent": percent,
-                "completed_gb": round(completed / (1024**3), 2) if completed else 0,
-                "total_gb": round(total / (1024**3), 2) if total else 0,
+                "completed_gb": round(completed / (1024**3), 2),
+                "total_gb": round(total / (1024**3), 2),
                 "done": status == 'success'
             }
     except Exception as e:

@@ -24,6 +24,8 @@ Thumbs.db
 .DS_Store
 desktop.ini
 
+memory.db
+
 # === Skills geradas dinamicamente (opcionais) ===
 # Descomente a linha abaixo se quiser ignorar skills criadas pelo agente
 # skills/*.py
