@@ -7,9 +7,18 @@
     <title>SwitchBot</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script type="importmap">
+        { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+    </script>
 </head>
 
 <body class="mascot-active">
+
+    <!-- Camada de Glow Ambiente (reage às emoções) -->
+    <div id="bg-glow"></div>
+    <!-- Canvas 3D Three.js -->
+    <div id="canvas-container"></div>
+
     <!-- ======================== HEADER (SÓ APARECE NO MODO CHAT) ======================== -->
     <header class="header" id="dragArea">
         <div class="header-left">
@@ -42,71 +51,28 @@
         <!-- ======================== MODO MASCOTE ======================== -->
         <div id="mascotView" class="view-mode mascot-mode">
 
-            <!-- Mascote flutuante com posição dinâmica -->
-            <div class="mascot-wrapper pos-center" id="mascotWrapper">
+            <!-- Região de arrastar a janela (cobre o mascote, apenas no modo Electron) -->
+            <div id="petDragRegion" class="pet-drag-region"></div>
 
-                <!-- Controles Flutuantes (Aparecem no Hover) -->
-                <div class="mascot-controls">
-                    <button class="m-btn" id="mBtnLeft" title="Mover para Esquerda">◀</button>
-                    <button class="m-btn m-btn-chat" id="mBtnChat" title="Voltar para Chat">💬 Abrir Chat</button>
-                    <button class="m-btn" id="mBtnRight" title="Mover para Direita">▶</button>
-                </div>
+            <!-- Botão ocultar (Electron) -->
+            <button id="btnHidePet" class="hide-pet-btn" title="Ocultar (Alt+H)">✕</button>
 
-                <!-- Balão de Diálogo -->
+            <!-- Overlay flutuante: balão + botão chat -->
+            <div class="mascot-overlay" id="mascotWrapper">
+
+                <!-- Balão de Diálogo (dinâmico, sem corte) -->
                 <div class="speech-bubble hidden" id="mascotSpeechBubble">
-                    <div class="speech-content" id="mascotText">Olá! Eu sou o SwitchBot.</div>
+                    <div class="speech-content" id="mascotText"></div>
                     <div class="typing-indicator hidden" id="mascotTyping">
                         <span></span><span></span><span></span>
                     </div>
                 </div>
 
-                <!-- Avatar SVG Cartoon -->
-                <div class="mascot-avatar idle" id="mascotAvatar">
-                    <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                            <linearGradient id="cloudGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stop-color="#ffffff" />
-                                <stop offset="100%" stop-color="#d4ebff" />
-                            </linearGradient>
-                            <filter id="glow">
-                                <feGaussianBlur stdDeviation="4" result="coloredBlur" />
-                                <feMerge>
-                                    <feMergeNode in="coloredBlur" />
-                                    <feMergeNode in="SourceGraphic" />
-                                </feMerge>
-                            </filter>
-                        </defs>
-
-                        <!-- Corpo Nuvem -->
-                        <g fill="url(#cloudGrad)" filter="url(#glow)">
-                            <circle cx="60" cy="65" r="35" />
-                            <circle cx="35" cy="55" r="22" />
-                            <circle cx="85" cy="55" r="22" />
-                            <circle cx="25" cy="75" r="15" />
-                            <circle cx="95" cy="75" r="15" />
-                            <circle cx="45" cy="85" r="18" />
-                            <circle cx="75" cy="85" r="18" />
-                            <circle cx="60" cy="40" r="25" />
-                        </g>
-
-                        <!-- Olhos com Animação de Piscar -->
-                        <g class="mascot-eyes" id="mascotEyes">
-                            <!-- Esquerdo -->
-                            <ellipse cx="45" cy="60" rx="8" ry="14" fill="#111" transform="rotate(-5, 45, 60)" />
-                            <path d="M43,53 L45,49 L47,53 L51,55 L47,57 L45,61 L43,57 L39,55 Z" fill="#fff" />
-                            <!-- Direito -->
-                            <ellipse cx="75" cy="60" rx="8" ry="14" fill="#111" transform="rotate(5, 75, 60)" />
-                            <path d="M73,53 L75,49 L77,53 L81,55 L77,57 L75,61 L73,57 L69,55 Z" fill="#fff" />
-                        </g>
-
-                        <!-- Expressão -->
-                        <path class="mascot-mouth" id="mascotMouth" d="M55,75 Q60,80 65,75" fill="none" stroke="#555"
-                            stroke-width="2.5" stroke-linecap="round" />
-                    </svg>
-                </div>
+                <!-- Botão abrir chat (fallback browser) -->
+                <button class="m-btn-chat" id="mBtnChat" title="Abrir Chat">💬 Abrir Chat</button>
             </div>
 
-            <!-- Gamificação: Barra de XP (Placeholder) -->
+            <!-- Gamificação: Barra de XP -->
             <div class="xp-container" id="xpContainer">
                 <div class="xp-header">
                     <span class="xp-level">Nível 1</span>
@@ -186,6 +152,215 @@
             <button class="save-btn" id="btnSaveSettings">✓ Aplicar Configuração</button>
         </div>
     </div>
+
+    <!-- ======================== ENGINE 3D (Three.js) ======================== -->
+    <script type="module">
+        import * as THREE from 'three';
+
+        const container = document.getElementById('canvas-container');
+        const bgGlow = document.getElementById('bg-glow');
+        const scene = new THREE.Scene();
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 0, 8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
+
+        // Luzes
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const mainLight = new THREE.DirectionalLight(0xffffff, 2);
+        mainLight.position.set(5, 10, 7);
+        scene.add(mainLight);
+        const rimLight = new THREE.DirectionalLight(0xaaccff, 4);
+        rimLight.position.set(-5, 5, -5);
+        scene.add(rimLight);
+        const fillLight = new THREE.DirectionalLight(0xffbbee, 1);
+        fillLight.position.set(0, -5, 5);
+        scene.add(fillLight);
+
+        // Grupos
+        const botGroup = new THREE.Group();
+        const bodyGroup = new THREE.Group();
+        botGroup.add(bodyGroup);
+        scene.add(botGroup);
+
+        // Material gelatina/nuvem
+        const cloudMat = new THREE.MeshPhysicalMaterial({
+            color: 0x88ccff, emissive: 0x112244,
+            roughness: 0.2, metalness: 0.1,
+            transmission: 0.8, thickness: 2.0,
+            clearcoat: 0.5, clearcoatRoughness: 0.2
+        });
+
+        // Corpo procedural (esferas fundidas)
+        const sphereGeo = new THREE.SphereGeometry(1, 64, 64);
+        const centerBody = new THREE.Mesh(sphereGeo, cloudMat);
+        centerBody.scale.set(1.4, 1.2, 1.2);
+        bodyGroup.add(centerBody);
+
+        [
+            { x: -1.0, y: 0.2, z: 0.2, s: 0.8 },
+            { x: 1.0, y: 0.2, z: 0.2, s: 0.8 },
+            { x: -0.6, y: -0.6, z: 0.1, s: 0.7 },
+            { x: 0.6, y: -0.6, z: 0.1, s: 0.7 },
+            { x: 0, y: 0.8, z: 0.1, s: 0.9 },
+            { x: 0, y: -0.8, z: 0, s: 0.6 }
+        ].forEach(p => {
+            const puff = new THREE.Mesh(sphereGeo, cloudMat);
+            puff.position.set(p.x, p.y, p.z);
+            puff.scale.setScalar(p.s);
+            bodyGroup.add(puff);
+        });
+
+        // Olhos
+        const eyeGroupBase = new THREE.Group();
+        bodyGroup.add(eyeGroupBase);
+        eyeGroupBase.position.set(0, 0.1, 1.15);
+
+        const eyeBaseMat = new THREE.MeshStandardMaterial({ color: 0x050a14, roughness: 0.1, metalness: 0.8 });
+        const sparkleMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+        function createEye() {
+            const g = new THREE.Group();
+            const bg = new THREE.Mesh(new THREE.SphereGeometry(0.3, 32, 32), eyeBaseMat);
+            bg.scale.set(0.8, 1.4, 0.4);
+            g.add(bg);
+            const s1 = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), sparkleMat);
+            s1.position.set(-0.08, 0.15, 0.11);
+            g.add(s1);
+            const s2 = new THREE.Mesh(new THREE.SphereGeometry(0.03, 16, 16), sparkleMat);
+            s2.position.set(0.08, -0.1, 0.11);
+            g.add(s2);
+            return g;
+        }
+        const eyeL = createEye(); eyeL.position.set(-0.5, 0, 0);
+        const eyeR = createEye(); eyeR.position.set(0.5, 0, 0);
+        eyeGroupBase.add(eyeL, eyeR);
+
+        // Sistema de estados e emoções
+        const engineState = {
+            targetColor: new THREE.Color(0x88ccff),
+            targetBodyScaleX: 1, targetBodyScaleY: 1,
+            targetEyeScaleY: 1, targetEyeRotZ: 0, targetEyePosY: 0.1,
+            isBlinking: false, isThinking: false
+        };
+
+        const emotions = {
+            NEUTRAL:  { color: 0x88ccff, glow: 'rgba(136,204,255,0.1)',  bodyX: 1,    bodyY: 1,    eyeSY: 1,   eyeRZ: 0,    eyePY: 0.1 },
+            JOY:      { color: 0xffbbee, glow: 'rgba(255,187,238,0.2)',  bodyX: 0.9,  bodyY: 1.1,  eyeSY: 0.2, eyeRZ: 0.2,  eyePY: 0.2 },
+            SAD:      { color: 0x446688, glow: 'rgba(68,102,136,0.2)',   bodyX: 1.1,  bodyY: 0.85, eyeSY: 0.8, eyeRZ: -0.2, eyePY: 0.0 },
+            ANGRY:    { color: 0xff4444, glow: 'rgba(255,68,68,0.2)',    bodyX: 1.15, bodyY: 0.9,  eyeSY: 0.6, eyeRZ: 0.3,  eyePY: 0.05 },
+            SURPRISE: { color: 0xa855f7, glow: 'rgba(168,85,247,0.2)',   bodyX: 0.9,  bodyY: 1.2,  eyeSY: 1.5, eyeRZ: 0,    eyePY: 0.3 }
+        };
+
+        function setEmotion(key, intensity = 1.0) {
+            const em = emotions[key] || emotions.NEUTRAL;
+            const base = emotions.NEUTRAL;
+            engineState.targetColor.copy(new THREE.Color(base.color).lerp(new THREE.Color(em.color), intensity));
+            bgGlow.style.background = `radial-gradient(circle, ${em.glow} 0%, rgba(0,0,0,0) 70%)`;
+            engineState.targetBodyScaleX = base.bodyX + (em.bodyX - base.bodyX) * intensity;
+            engineState.targetBodyScaleY = base.bodyY + (em.bodyY - base.bodyY) * intensity;
+            engineState.targetEyeScaleY  = base.eyeSY + (em.eyeSY - base.eyeSY) * intensity;
+            engineState.targetEyePosY    = base.eyePY + (em.eyePY - base.eyePY) * intensity;
+            engineState.targetEyeRotZ    = em.eyeRZ * intensity;
+        }
+
+        // Piscada autônoma
+        function scheduleBlink() {
+            setTimeout(() => {
+                if (!engineState.isThinking) {
+                    engineState.isBlinking = true;
+                    setTimeout(() => { engineState.isBlinking = false; }, 150);
+                }
+                scheduleBlink();
+            }, 2500 + Math.random() * 5000);
+        }
+        scheduleBlink();
+
+        // Mouse tracking
+        let mouseX = 0, mouseY = 0;
+        document.addEventListener('mousemove', e => {
+            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        // Posição base: no Electron a janela é dedicada ao mascote → centraliza
+        // No browser, desloca para a esquerda para não sobrepor o chat
+        const isElectron = !!window.electronAPI;
+        let basePosX = 0, basePosY = 0;
+        function updateLayout() {
+            if (isElectron) {
+                basePosX = 0;
+                basePosY = 0;
+            } else {
+                basePosX = window.innerWidth > 768 ? -2.2 : 0;
+                basePosY = window.innerWidth > 768 ? 0 : 2.2;
+            }
+        }
+        updateLayout();
+
+        // Loop de animação
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            if (!engineState.isThinking) {
+                botGroup.rotation.y = THREE.MathUtils.lerp(botGroup.rotation.y, mouseX * 0.5, 0.05);
+                botGroup.rotation.x = THREE.MathUtils.lerp(botGroup.rotation.x, -mouseY * 0.5, 0.05);
+                botGroup.rotation.z = THREE.MathUtils.lerp(botGroup.rotation.z, -mouseX * 0.1, 0.05);
+            }
+
+            const floatAmp   = engineState.isThinking ? 0.2 : 0.15;
+            const floatSpeed = engineState.isThinking ? 6 : 2;
+            botGroup.position.x = THREE.MathUtils.lerp(botGroup.position.x, basePosX, 0.05);
+            botGroup.position.y = THREE.MathUtils.lerp(botGroup.position.y, basePosY + Math.sin(time * floatSpeed) * floatAmp, 0.1);
+
+            const pulseColor = engineState.targetColor.clone();
+            if (engineState.isThinking) pulseColor.lerp(new THREE.Color(0xffffff), Math.sin(time * 10) * 0.2 + 0.2);
+            cloudMat.color.lerp(pulseColor, 0.1);
+
+            let sX = engineState.targetBodyScaleX;
+            let sY = engineState.targetBodyScaleY;
+            if (engineState.isThinking) { sX += Math.sin(time * 15) * 0.05; sY -= Math.sin(time * 15) * 0.05; }
+            const breath = Math.sin(time * 2) * 0.02;
+            bodyGroup.scale.x = THREE.MathUtils.lerp(bodyGroup.scale.x, sX + breath, 0.1);
+            bodyGroup.scale.y = THREE.MathUtils.lerp(bodyGroup.scale.y, sY - breath, 0.1);
+            bodyGroup.scale.z = THREE.MathUtils.lerp(bodyGroup.scale.z, (2 - sY) + breath, 0.1);
+
+            const blinkSY = engineState.isBlinking ? 0.05 : engineState.targetEyeScaleY;
+            eyeL.scale.y = THREE.MathUtils.lerp(eyeL.scale.y, blinkSY, 0.3);
+            eyeL.rotation.z = THREE.MathUtils.lerp(eyeL.rotation.z, engineState.targetEyeRotZ, 0.1);
+            eyeR.scale.y = THREE.MathUtils.lerp(eyeR.scale.y, blinkSY, 0.3);
+            eyeR.rotation.z = THREE.MathUtils.lerp(eyeR.rotation.z, -engineState.targetEyeRotZ, 0.1);
+            eyeGroupBase.position.y = THREE.MathUtils.lerp(eyeGroupBase.position.y, engineState.targetEyePosY, 0.1);
+            eyeGroupBase.children.forEach(eye => {
+                if (eye.children.length > 1) eye.children[1].position.y = 0.15 + Math.sin(time * 3) * 0.02;
+            });
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            updateLayout();
+        });
+
+        // Animação de boas-vindas
+        setTimeout(() => setEmotion('JOY', 0.7), 800);
+        setTimeout(() => setEmotion('NEUTRAL', 1.0), 2800);
+
+        // Expõe a engine para o script.js (não-módulo)
+        window.botEngine = { setEmotion, engineState };
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="script.js"></script>

@@ -19,13 +19,40 @@ body {
 
 /* ===== MÁGICA DA TRANSPARÊNCIA ===== */
 body.mascot-active {
-    /* Deixa o fundo completamente transparente/limpo */
     background-color: transparent;
 }
 
+/* Electron pet mode: body 100% transparente — sem nenhum fundo */
+body.electron-pet-mode {
+    background-color: transparent !important;
+    background:       transparent !important;
+}
+
+
 body.mascot-active .header {
     display: none;
-    /* Esconde a barra superior feia */
+}
+
+/* ===== CAMADAS 3D ===== */
+#canvas-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+
+#bg-glow {
+    position: fixed;
+    top: 50%; left: 28%;
+    transform: translate(-50%, -50%);
+    width: 60vw; height: 60vw;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(136,204,255,0.1) 0%, rgba(0,0,0,0) 70%);
+    z-index: 0;
+    filter: blur(50px);
+    transition: background 1s ease;
+    pointer-events: none;
 }
 
 /* ======================== HEADER (SÓ CHAT) ======================== */
@@ -162,132 +189,150 @@ body.mascot-active .header {
 .mascot-mode {
     background: transparent;
     pointer-events: none;
-    /* Deixa clicar "através" do fundo se for nativo */
 }
 
-/* Wrapper do Mascote (Posicionamento Livre) */
-.mascot-wrapper {
-    position: absolute;
-    width: 200px;
-    height: 200px;
+/* ── Região de arrastar (Electron) ─────────────────────────────────── */
+.pet-drag-region {
+    display: none;
+}
+
+.electron-pet-mode .pet-drag-region {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    -webkit-app-region: drag;
+    cursor: move;
+}
+
+/* Elementos interativos ficam acima do drag e capturam o mouse */
+.electron-pet-mode .mascot-overlay,
+.electron-pet-mode .input-area,
+.electron-pet-mode .speech-bubble,
+.electron-pet-mode .hide-pet-btn,
+.electron-pet-mode .settings-panel,
+.electron-pet-mode .settings-overlay {
+    -webkit-app-region: no-drag;
+}
+
+/* ── Botão Ocultar Janela ─────────────────────────────────────────── */
+.hide-pet-btn {
+    display: none;
+}
+
+.electron-pet-mode .hide-pet-btn {
     display: flex;
-    flex-direction: column;
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 200;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 12px;
+    cursor: pointer;
     align-items: center;
     justify-content: center;
-    transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    /* Efeito elástico ao mover */
-    pointer-events: auto;
-    /* Permite interagir com o mascote */
-}
-
-/* Posições */
-.mascot-wrapper.pos-center {
-    top: 10%;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-.mascot-wrapper.pos-left {
-    top: 10%;
-    left: 5%;
-}
-
-.mascot-wrapper.pos-right {
-    top: 10%;
-    right: 5%;
-}
-
-/* Controles Invisíveis no Hover */
-.mascot-controls {
-    position: absolute;
-    bottom: -10px;
-    display: flex;
-    gap: 8px;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 6px 12px;
-    border-radius: 20px;
     opacity: 0;
-    transform: translateY(10px);
-    transition: all 0.3s ease;
-    backdrop-filter: blur(5px);
-    z-index: 20;
+    transition: opacity 0.25s, background 0.25s;
+    pointer-events: auto;
 }
 
-.mascot-wrapper:hover .mascot-controls {
+.electron-pet-mode:hover .hide-pet-btn {
     opacity: 1;
-    transform: translateY(0);
 }
 
-.m-btn {
-    background: none;
-    border: none;
+.electron-pet-mode .hide-pet-btn:hover {
+    background: rgba(220, 50, 50, 0.75);
     color: #fff;
-    cursor: pointer;
-    font-size: 12px;
-    transition: transform 0.2s;
+    border-color: rgba(255, 80, 80, 0.5);
 }
 
-.m-btn:hover {
-    transform: scale(1.2);
-    color: #82b1ff;
+/* Oculta a XP bar no pet (espaço reduzido) */
+.electron-pet-mode .xp-container { display: none; }
+
+/* ── Transparência total no modo pet ──────────────────────────────────────
+   Elimina todos os backgrounds que criam o "retângulo" visível na janela  */
+.electron-pet-mode,
+.electron-pet-mode .main-container,
+.electron-pet-mode .view-mode,
+.electron-pet-mode .mascot-mode,
+.electron-pet-mode .chat-mode {
+    background: transparent !important;
+    background-color: transparent !important;
 }
 
+/* O bg-glow cria um retângulo de gradiente visível — removido no pet mode */
+.electron-pet-mode #bg-glow {
+    display: none !important;
+}
+
+/* Input area: remove sombra quadrada e backdrop-filter (causam artefatos) */
+.electron-pet-mode .input-area {
+    box-shadow:         none !important;
+    backdrop-filter:    none !important;
+    -webkit-backdrop-filter: none !important;
+    /* Mantém o estilo pill, mas sem efeitos que "derramam" fora do border-radius */
+    background: rgba(12, 12, 18, 0.82) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+
+/* ======================== MASCOTE OVERLAY (posicionamento fixo) ======================== */
+.mascot-overlay {
+    position: fixed;
+    left: 5%;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    z-index: 20;
+    pointer-events: none;
+}
+
+@media (max-width: 768px) {
+    .mascot-overlay {
+        left: 50%;
+        top: 18%;
+        transform: translateX(-50%);
+        align-items: center;
+    }
+}
+
+/* Botão Abrir Chat */
 .m-btn-chat {
+    pointer-events: auto;
     font-family: 'Inter', sans-serif;
     font-weight: 600;
-    font-size: 11px;
-    margin: 0 5px;
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #c8d8f8;
+    padding: 7px 18px;
+    border-radius: 20px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: all 0.25s ease;
+    opacity: 0.75;
 }
 
-/* Avatar Base */
+.m-btn-chat:hover {
+    opacity: 1;
+    background: rgba(68, 138, 255, 0.2);
+    border-color: rgba(68, 138, 255, 0.4);
+    color: #82b1ff;
+    transform: scale(1.05);
+}
+
+/* Avatar SVG substituído pelo canvas 3D — mantido apenas para não quebrar refs */
 .mascot-avatar {
-    width: 150px;
-    height: 150px;
-    filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.3));
-    transform-origin: bottom center;
-}
-
-/* Olhos Cartoon (Piscar aleatório) */
-.mascot-eyes {
-    transform-origin: 60px 60px;
-    animation: blink-eyes 4s infinite;
-}
-
-@keyframes blink-eyes {
-
-    0%,
-    95%,
-    98%,
-    100% {
-        transform: scaleY(1);
-    }
-
-    96%,
-    99% {
-        transform: scaleY(0.1);
-    }
-}
-
-/* ── ANIMAÇÕES CARTOON (SQUISH & STRETCH) ── */
-.mascot-avatar.idle {
-    animation: float-cartoon 3s ease-in-out infinite;
-}
-
-.mascot-avatar.thinking {
-    animation: rocking-cartoon 1.5s ease-in-out infinite, glow-blue 2s infinite;
-}
-
-.mascot-avatar.executing {
-    animation: squish-fast 0.6s infinite alternate, glow-orange 1.5s infinite;
-}
-
-.mascot-avatar.success {
-    animation: cartoon-jump 0.8s cubic-bezier(0.28, 0.84, 0.42, 1);
-}
-
-.mascot-avatar.error {
-    animation: cartoon-shake 0.5s ease;
-    filter: drop-shadow(0 0 20px rgba(255, 82, 82, 0.6));
+    display: none;
 }
 
 @keyframes float-cartoon {
@@ -388,38 +433,57 @@ body.mascot-active .header {
     }
 }
 
-/* Balão de Fala */
+/* Balão de Fala — dinâmico, sem corte de texto */
 .speech-bubble {
-    position: absolute;
-    top: -20px;
-    background: #fff;
-    color: #111;
-    padding: 12px 18px;
-    border-radius: 20px;
+    pointer-events: auto;
+    position: relative;
+    background: rgba(10, 14, 28, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(136, 204, 255, 0.18);
+    color: #d8eaff;
+    padding: 14px 18px;
+    border-radius: 18px;
     font-size: 13px;
-    font-weight: 600;
-    max-width: 250px;
-    text-align: center;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    font-weight: 500;
+    line-height: 1.6;
+    max-width: 280px;
+    min-width: 120px;
+    width: max-content;
+    word-break: break-word;
+    white-space: pre-wrap;
+    text-align: left;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(136,204,255,0.08);
     animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    z-index: 10;
-    transform-origin: bottom center;
+    z-index: 30;
+    transform-origin: bottom left;
+    /* Limita altura para textos muito longos e adiciona scroll */
+    max-height: 45vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.speech-bubble::-webkit-scrollbar {
+    width: 3px;
+}
+.speech-bubble::-webkit-scrollbar-thumb {
+    background: rgba(136, 204, 255, 0.2);
+    border-radius: 10px;
 }
 
 .speech-bubble::after {
     content: '';
     position: absolute;
     bottom: -8px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 22px;
     border-width: 8px 8px 0;
     border-style: solid;
-    border-color: #fff transparent transparent transparent;
+    border-color: rgba(10,14,28,0.88) transparent transparent;
 }
 
 .speech-bubble.hidden {
     opacity: 0;
-    transform: scale(0.5) translateY(20px);
+    transform: scale(0.7) translateY(10px);
     pointer-events: none;
     transition: all 0.2s ease;
 }

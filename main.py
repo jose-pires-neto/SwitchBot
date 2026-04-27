@@ -17,13 +17,9 @@ import os
 import sys
 import json
 import queue
-import ctypes
-import ctypes.wintypes
 import threading
-import subprocess
 import time
 from flask import Flask, send_from_directory, request, Response, jsonify
-import keyboard
 from jarvis_core import JarvisCore
 import model_manager
 
@@ -170,59 +166,6 @@ def delete_model():
     result = model_manager.delete_ollama_model(model_name)
     return jsonify(result)
 
-# ======================== WINDOW CONTROL ========================
-WINDOW_TITLE = "Jarvis Command Center"
-
-def find_window():
-    return ctypes.windll.user32.FindWindowW(None, WINDOW_TITLE)
-
-def toggle_overlay():
-    hwnd = find_window()
-    if hwnd:
-        if ctypes.windll.user32.IsWindowVisible(hwnd):
-            ctypes.windll.user32.ShowWindow(hwnd, 0)   # SW_HIDE
-        else:
-            ctypes.windll.user32.ShowWindow(hwnd, 9)   # SW_RESTORE
-            ctypes.windll.user32.SetForegroundWindow(hwnd)
-
-def set_always_on_top(hwnd):
-    HWND_TOPMOST = ctypes.wintypes.HWND(-1)
-    SWP_NOMOVE = 0x0002
-    SWP_NOSIZE = 0x0001
-    ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
-
-def open_app_window(port):
-    url = f'http://localhost:{port}'
-    edge_paths = [
-        os.path.expandvars(r'%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe'),
-        os.path.expandvars(r'%ProgramFiles%\Microsoft\Edge\Application\msedge.exe'),
-    ]
-    chrome_paths = [
-        os.path.expandvars(r'%ProgramFiles%\Google\Chrome\Application\chrome.exe'),
-        os.path.expandvars(r'%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe'),
-        os.path.expandvars(r'%LocalAppData%\Google\Chrome\Application\chrome.exe'),
-    ]
-    browser = None
-    for p in edge_paths + chrome_paths:
-        if os.path.exists(p):
-            browser = p
-            break
-
-    if browser:
-        subprocess.Popen([browser, f'--app={url}', '--window-size=700,580', '--disable-extensions'])
-    else:
-        import webbrowser
-        webbrowser.open(url)
-
-    def apply_on_top():
-        for _ in range(30):
-            time.sleep(0.5)
-            hwnd = find_window()
-            if hwnd:
-                set_always_on_top(hwnd)
-                break
-
-    threading.Thread(target=apply_on_top, daemon=True).start()
 
 # ======================== MAIN ========================
 if __name__ == '__main__':
@@ -237,12 +180,9 @@ if __name__ == '__main__':
         print(f"  Modelo   : {config['groq_model']}")
     else:
         print(f"  Modelo   : {config.get('ollama_model', 'não configurado')}")
-    print(f"  UI       : http://localhost:{PORT}")
-    print("  Atalho   : Alt+O (mostrar/esconder)")
+    print(f"  API      : http://localhost:{PORT}")
+    print(f"  Atalhos  : Alt+Space (input) | Alt+H (ocultar) | Alt+M (mostrar)")
     print("=" * 52)
-
-    keyboard.add_hotkey('alt+o', toggle_overlay)
-    threading.Timer(1.5, lambda: open_app_window(PORT)).start()
 
     import logging
     logging.getLogger('werkzeug').setLevel(logging.ERROR)
