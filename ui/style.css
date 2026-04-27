@@ -22,6 +22,13 @@ body.mascot-active {
     background-color: transparent;
 }
 
+/* Electron pet mode: body 100% transparente — sem nenhum fundo */
+body.electron-pet-mode {
+    background-color: transparent !important;
+    background:       transparent !important;
+}
+
+
 body.mascot-active .header {
     display: none;
 }
@@ -247,6 +254,33 @@ body.mascot-active .header {
 
 /* Oculta a XP bar no pet (espaço reduzido) */
 .electron-pet-mode .xp-container { display: none; }
+
+/* ── Transparência total no modo pet ──────────────────────────────────────
+   Elimina todos os backgrounds que criam o "retângulo" visível na janela  */
+.electron-pet-mode,
+.electron-pet-mode .main-container,
+.electron-pet-mode .view-mode,
+.electron-pet-mode .mascot-mode,
+.electron-pet-mode .chat-mode {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+/* O bg-glow cria um retângulo de gradiente visível — removido no pet mode */
+.electron-pet-mode #bg-glow {
+    display: none !important;
+}
+
+/* Input area: remove sombra quadrada e backdrop-filter (causam artefatos) */
+.electron-pet-mode .input-area {
+    box-shadow:         none !important;
+    backdrop-filter:    none !important;
+    -webkit-backdrop-filter: none !important;
+    /* Mantém o estilo pill, mas sem efeitos que "derramam" fora do border-radius */
+    background: rgba(12, 12, 18, 0.82) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
 
 /* ======================== MASCOTE OVERLAY (posicionamento fixo) ======================== */
 .mascot-overlay {
