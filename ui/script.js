@@ -13,16 +13,12 @@ const btnToggleMode = document.getElementById('btnToggleMode');
 const mascotView = document.getElementById('mascotView');
 const chatView = document.getElementById('chatView');
 
-// Mascot DOM & Positions
+// Mascot DOM
 const mascotWrapper = document.getElementById('mascotWrapper');
-const mBtnLeft = document.getElementById('mBtnLeft');
-const mBtnRight = document.getElementById('mBtnRight');
 const mBtnChat = document.getElementById('mBtnChat');
-const mascotAvatar = document.getElementById('mascotAvatar');
 const mascotSpeech = document.getElementById('mascotSpeechBubble');
 const mascotText = document.getElementById('mascotText');
 const mascotTyping = document.getElementById('mascotTyping');
-const mascotMouth = document.getElementById('mascotMouth');
 
 // Chat DOM
 const timeline = document.getElementById('timeline');
@@ -92,17 +88,23 @@ function updateModelBadge(config) {
 // MUDANÇA DE MODOS E POSIÇÕES
 // ============================================================
 function applyMode() {
+    const canvas3d = document.getElementById('canvas-container');
+    const bgGlow   = document.getElementById('bg-glow');
+
     if (currentMode === 'mascot') {
         bodyElement.classList.add('mascot-active');
         mascotView.classList.remove('hidden');
         chatView.classList.add('hidden');
         document.getElementById('inputArea').style.display = 'flex';
+        if (canvas3d) canvas3d.style.display = 'block';
+        if (bgGlow)   bgGlow.style.display   = 'block';
     } else {
         bodyElement.classList.remove('mascot-active');
         mascotView.classList.add('hidden');
         chatView.classList.remove('hidden');
+        if (canvas3d) canvas3d.style.display = 'none';
+        if (bgGlow)   bgGlow.style.display   = 'none';
 
-        // Garante que o scroll role para o fim quando alternamos de modo
         setTimeout(() => {
             timeline.scrollTop = timeline.scrollHeight;
             const lastCard = timeline.lastElementChild;
@@ -121,33 +123,40 @@ mBtnChat.addEventListener('click', () => {
     applyMode();
 });
 
-// Posições do Mascote (Esquerda, Centro, Direita)
-const positions = ['pos-left', 'pos-center', 'pos-right'];
-let currentPosIdx = 1; // Centro
-
-function updatePosition(dir) {
-    mascotWrapper.classList.remove(positions[currentPosIdx]);
-    currentPosIdx += dir;
-    if (currentPosIdx < 0) currentPosIdx = 0;
-    if (currentPosIdx > 2) currentPosIdx = 2;
-    mascotWrapper.classList.add(positions[currentPosIdx]);
-}
-
-mBtnLeft.addEventListener('click', () => updatePosition(-1));
-mBtnRight.addEventListener('click', () => updatePosition(1));
+// Posicionamento do mascote gerenciado pela engine 3D (basePosX)
 
 // ============================================================
-// LÓGICA DO MASCOTE (EXPRESSÕES E FALA)
+// LÓGICA DO MASCOTE (ESTADOS → ENGINE 3D)
 // ============================================================
 function setMascotState(state, text = '') {
-    // Aplica a animação (idle, thinking, executing, success, error)
-    mascotAvatar.className = 'mascot-avatar ' + state;
-
-    // Atualiza a boca
-    if (state === 'idle') mascotMouth.setAttribute('d', 'M55,75 Q60,80 65,75'); // Sorriso suave
-    else if (state === 'success') mascotMouth.setAttribute('d', 'M50,75 Q60,90 70,75'); // Sorrisão
-    else if (state === 'thinking' || state === 'executing') mascotMouth.setAttribute('d', 'M55,77 Q60,76 65,77'); // Focado
-    else if (state === 'error') mascotMouth.setAttribute('d', 'M52,80 Q60,72 68,80'); // Triste
+    // Mapeia estado → emoção 3D
+    if (window.botEngine) {
+        const { setEmotion, engineState } = window.botEngine;
+        switch (state) {
+            case 'idle':
+                engineState.isThinking = false;
+                setEmotion('NEUTRAL', 1.0);
+                break;
+            case 'thinking':
+                engineState.isThinking = true;
+                setEmotion('NEUTRAL', 1.0);
+                break;
+            case 'executing':
+                engineState.isThinking = true;
+                setEmotion('SURPRISE', 0.6);
+                break;
+            case 'success':
+                engineState.isThinking = false;
+                setEmotion('JOY', 0.9);
+                setTimeout(() => setEmotion('NEUTRAL', 1.0), 3000);
+                break;
+            case 'error':
+                engineState.isThinking = false;
+                setEmotion('SAD', 0.8);
+                setTimeout(() => setEmotion('NEUTRAL', 1.0), 3000);
+                break;
+        }
+    }
 
     clearTimeout(mascotSpeechTimeout);
 
@@ -160,16 +169,13 @@ function setMascotState(state, text = '') {
         mascotTyping.classList.add('hidden');
         mascotText.classList.remove('hidden');
 
-        let shortText = text.replace(/<[^>]*>?/gm, ''); // Remove tags pro balão
-        if (shortText.length > 90) shortText = shortText.substring(0, 90) + '...';
-        mascotText.textContent = shortText;
+        // Exibe o texto completo, sem corte
+        mascotText.textContent = text.replace(/<[^>]*>?/gm, '');
 
         if (state === 'success' || state === 'error') {
             mascotSpeechTimeout = setTimeout(() => {
                 mascotSpeech.classList.add('hidden');
-                mascotAvatar.className = 'mascot-avatar idle';
-                mascotMouth.setAttribute('d', 'M55,75 Q60,80 65,75');
-            }, 5000);
+            }, 6000);
         }
     } else {
         mascotSpeech.classList.add('hidden');

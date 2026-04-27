@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agente Nuvem Dinâmico</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b1121;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            pointer-events: none;
+        }
+
+        .glass-panel {
+            background: rgba(11, 17, 33, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            pointer-events: auto;
+        }
+
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            max-height: 50vh;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .chat-container::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .chat-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .msg-enter {
+            animation: fadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(15px) scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* Ambient glow animation */
+        #bg-glow {
+            position: absolute;
+            top: 50%;
+            left: 30%;
+            transform: translate(-50%, -50%);
+            width: 60vw;
+            height: 60vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(136, 204, 255, 0.1) 0%, rgba(0, 0, 0, 0) 70%);
+            z-index: 0;
+            filter: blur(50px);
+            transition: background 1s ease;
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+</head>
+
+<body class="text-white">
+
+    <div id="bg-glow"></div>
+    <!-- Container do 3D -->
+    <div id="canvas-container"></div>
+
+    <!-- Camada de UI (Chat e Configs) -->
+    <div id="ui-layer" class="p-4 md:p-8 flex flex-col md:flex-row gap-4 justify-between h-full pointer-events-none">
+
+        <!-- Header / API Key Config (Esquerda) -->
+        <div class="w-full md:w-80 flex flex-col gap-4">
+            <div class="glass-panel p-5 rounded-2xl w-full flex flex-col gap-4 shadow-2xl pointer-events-auto">
+                <div class="flex items-center justify-between">
+                    <h1 class="font-bold text-lg flex items-center gap-2 tracking-wide">
+                        <i class="fa-solid fa-cloud text-blue-400"></i> SkyAgent
+                    </h1>
+                    <span id="status-indicator"
+                        class="text-xs px-2 py-1 bg-red-500/10 text-red-400 rounded-full border border-red-500/20">Sem
+                        API Key</span>
+                </div>
+                <div class="flex gap-2">
+                    <input type="password" id="api-key-input" placeholder="GROQ API Key..."
+                        class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors shadow-inner">
+                    <button id="save-key-btn"
+                        class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-lg hover:shadow-blue-500/25">Iniciar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Area (Direita) -->
+        <div
+            class="glass-panel p-1 rounded-2xl w-full md:w-[28rem] flex flex-col shadow-2xl h-[60vh] md:h-[85vh] self-end pointer-events-auto overflow-hidden">
+            <div class="p-4 flex flex-col gap-3 flex-grow overflow-hidden">
+                <div id="chat-messages" class="chat-container pr-2 flex flex-col gap-4 flex-grow">
+                    <!-- Mensagem Inicial -->
+                    <div class="flex items-start gap-3 msg-enter">
+                        <div
+                            class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
+                            <i class="fa-solid fa-sparkles text-xs text-white"></i>
+                        </div>
+                        <div
+                            class="bg-slate-800/80 rounded-2xl rounded-tl-sm px-4 py-3 text-sm max-w-[85%] border border-slate-700/50 shadow-sm leading-relaxed">
+                            Olá! Eu sou o Sky, seu agente procedural de nova geração. ✨ <br><br>
+                            Insira sua chave do Groq e mexa o mouse pela tela para me ver reagir!
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <form id="chat-form" class="flex gap-2 relative shrink-0 mt-2">
+                    <input type="text" id="chat-input" placeholder="Converse comigo..." disabled
+                        class="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl pl-4 pr-12 py-3 text-sm focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50 shadow-inner">
+                    <button type="submit" id="send-btn" disabled
+                        class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md">
+                        <i class="fa-solid fa-paper-plane text-xs"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lógica Principal -->
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- 1. CONFIGURAÇÃO DO THREE.JS ---
+        const container = document.getElementById('canvas-container');
+        const bgGlow = document.getElementById('bg-glow');
+        const scene = new THREE.Scene();
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 0, 8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; // Cores mais ricas
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
+
+        // Luzes super importantes para o material translúcido
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 2);
+        mainLight.position.set(5, 10, 7);
+        scene.add(mainLight);
+
+        const rimLight = new THREE.DirectionalLight(0xaaccff, 4); // Luz de recorte azulada
+        rimLight.position.set(-5, 5, -5);
+        scene.add(rimLight);
+
+        const fillLight = new THREE.DirectionalLight(0xffbbee, 1);
+        fillLight.position.set(0, -5, 5);
+        scene.add(fillLight);
+
+        // --- 2. CONSTRUÇÃO DO MASCOTE SORA-LIKE ---
+        const botGroup = new THREE.Group();
+        const bodyGroup = new THREE.Group(); // Para isolar o squash & stretch
+        botGroup.add(bodyGroup);
+        scene.add(botGroup);
+
+        // Material da Nuvem (Gelatina/Transmissão)
+        const cloudMat = new THREE.MeshPhysicalMaterial({
+            color: 0x88ccff,        // Azul claro base
+            emissive: 0x112244,     // Brilho interno sutil
+            roughness: 0.2,         // Superfície um pouco lisa
+            metalness: 0.1,
+            transmission: 0.8,      // 80% de transparência tipo vidro/gel
+            thickness: 2.0,         // Espessura do volume
+            clearcoat: 0.5,         // Verniz por cima
+            clearcoatRoughness: 0.2
+        });
+
+        // Montando o corpo proceduralmente (Várias esferas fundidas visualmente)
+        const sphereGeo = new THREE.SphereGeometry(1, 64, 64);
+        const centerBody = new THREE.Mesh(sphereGeo, cloudMat);
+        centerBody.scale.set(1.4, 1.2, 1.2);
+        bodyGroup.add(centerBody);
+
+        // Pufes ao redor para dar formato de nuvem
+        const puffPositions = [
+            { x: -1.0, y: 0.2, z: 0.2, s: 0.8 },
+            { x: 1.0, y: 0.2, z: 0.2, s: 0.8 },
+            { x: -0.6, y: -0.6, z: 0.1, s: 0.7 },
+            { x: 0.6, y: -0.6, z: 0.1, s: 0.7 },
+            { x: 0, y: 0.8, z: 0.1, s: 0.9 },
+            { x: 0, y: -0.8, z: 0, s: 0.6 }
+        ];
+
+        puffPositions.forEach(p => {
+            const puff = new THREE.Mesh(sphereGeo, cloudMat);
+            puff.position.set(p.x, p.y, p.z);
+            puff.scale.setScalar(p.s);
+            bodyGroup.add(puff);
+        });
+
+        // Olhos (Estilo Sora - Óvalos escuros com brilhos)
+        const eyeGroupBase = new THREE.Group();
+        bodyGroup.add(eyeGroupBase);
+        eyeGroupBase.position.set(0, 0.1, 1.15); // Traz os olhos pra frente da nuvem
+
+        const eyeBaseMat = new THREE.MeshStandardMaterial({
+            color: 0x050a14, roughness: 0.1, metalness: 0.8
+        });
+        const sparkleMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+        function createEye() {
+            const group = new THREE.Group();
+
+            // Fundo escuro do olho
+            const eyeBg = new THREE.Mesh(new THREE.SphereGeometry(0.3, 32, 32), eyeBaseMat);
+            eyeBg.scale.set(0.8, 1.4, 0.4); // Achata e alonga
+            group.add(eyeBg);
+
+            // Brilho Maior (Estrela/Diamante improvisado com 2 cones unidos)
+            const sparkle1 = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), sparkleMat);
+            sparkle1.position.set(-0.08, 0.15, 0.11);
+            group.add(sparkle1);
+
+            // Brilho Menor
+            const sparkle2 = new THREE.Mesh(new THREE.SphereGeometry(0.03, 16, 16), sparkleMat);
+            sparkle2.position.set(0.08, -0.1, 0.11);
+            group.add(sparkle2);
+
+            return group;
+        }
+
+        const eyeL = createEye();
+        eyeL.position.set(-0.5, 0, 0);
+
+        const eyeR = createEye();
+        eyeR.position.set(0.5, 0, 0);
+
+        eyeGroupBase.add(eyeL, eyeR);
+
+        // --- 3. SISTEMA DE EMOÇÕES E ESTADOS (SQUASH & STRETCH) ---
+        const state = {
+            targetColor: new THREE.Color(0x88ccff),
+            targetBodyScaleX: 1,
+            targetBodyScaleY: 1,
+            targetEyeScaleY: 1,
+            targetEyeRotZ: 0,
+            targetEyePosY: 0.1,
+
+            isBlinking: false,
+            isThinking: false,
+            talkPulse: 0
+        };
+
+        const emotions = {
+            NEUTRAL: {
+                color: 0x88ccff, glow: 'rgba(136, 204, 255, 0.1)',
+                bodyX: 1, bodyY: 1, eyeSY: 1, eyeRZ: 0, eyePY: 0.1
+            },
+            JOY: {
+                color: 0xffbbee, glow: 'rgba(255, 187, 238, 0.2)', // Rosa amigável
+                bodyX: 0.9, bodyY: 1.1,  // Estica pra cima de alegria
+                eyeSY: 0.2, eyeRZ: 0.2, eyePY: 0.2 // Olhinhos fechados e felizes ^ ^
+            },
+            SAD: {
+                color: 0x446688, glow: 'rgba(68, 102, 136, 0.2)', // Tristeza cinza/azul
+                bodyX: 1.1, bodyY: 0.85, // Murcha
+                eyeSY: 0.8, eyeRZ: -0.2, eyePY: 0.0 // Olhos caídos
+            },
+            ANGRY: {
+                color: 0xff4444, glow: 'rgba(255, 68, 68, 0.2)', // Vermelho
+                bodyX: 1.15, bodyY: 0.9, // Infla de raiva
+                eyeSY: 0.6, eyeRZ: 0.3, eyePY: 0.05 // Olhos cerrados e bravos \ /
+            },
+            SURPRISE: {
+                color: 0xa855f7, glow: 'rgba(168, 85, 247, 0.2)', // Roxo mágico
+                bodyX: 0.9, bodyY: 1.2, // Esticão de susto
+                eyeSY: 1.5, eyeRZ: 0, eyePY: 0.3 // Olhões arregalados
+            }
+        };
+
+        function setEmotion(emotionKey, intensity = 1.0) {
+            const em = emotions[emotionKey] || emotions.NEUTRAL;
+            const base = emotions.NEUTRAL;
+
+            const targetC = new THREE.Color(base.color).lerp(new THREE.Color(em.color), intensity);
+            state.targetColor.copy(targetC);
+            bgGlow.style.background = `radial-gradient(circle, ${em.glow} 0%, rgba(0,0,0,0) 70%)`;
+
+            // Física guiada por emoção
+            state.targetBodyScaleX = base.bodyX + (em.bodyX - base.bodyX) * intensity;
+            state.targetBodyScaleY = base.bodyY + (em.bodyY - base.bodyY) * intensity;
+            state.targetEyeScaleY = base.eyeSY + (em.eyeSY - base.eyeSY) * intensity;
+            state.targetEyePosY = base.eyePY + (em.eyePY - base.eyePY) * intensity;
+
+            // Tratamento especial para rotação do olho (espelhado)
+            state.targetEyeRotZ = em.eyeRZ * intensity;
+        }
+
+        // Sistema Autônomo (Piscada)
+        function scheduleBlink() {
+            setTimeout(() => {
+                if (!state.isThinking) {
+                    state.isBlinking = true;
+                    setTimeout(() => state.isBlinking = false, 150);
+                }
+                scheduleBlink();
+            }, 2500 + Math.random() * 5000);
+        }
+        scheduleBlink();
+
+        // --- INTERAÇÃO COM O MOUSE (Acompanhar o olhar) ---
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetLookX = 0;
+        let targetLookY = 0;
+
+        document.addEventListener('mousemove', (event) => {
+            // Normaliza coordendas de -1 a 1
+            mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+        });
+
+
+        // --- Posicionamento Dinâmico (Desvia da UI) ---
+        let basePosX = 0;
+        let basePosY = 0;
+        function updateLayout() {
+            if (window.innerWidth > 768) {
+                basePosX = -2.5;
+                basePosY = 0;
+            } else {
+                basePosX = 0;
+                basePosY = 3.0; // Sobe no mobile
+            }
+        }
+        updateLayout();
+
+        // --- 4. LOOP DE ANIMAÇÃO (VIDA PROCEDURAL) ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+            const delta = clock.getDelta();
+
+            // 1. Mouse Tracking Suave
+            targetLookX = mouseX * 0.5; // Limita o quão longe a cabeça vira
+            targetLookY = mouseY * 0.5;
+
+            if (!state.isThinking) {
+                botGroup.rotation.y = THREE.MathUtils.lerp(botGroup.rotation.y, targetLookX, 0.05);
+                botGroup.rotation.x = THREE.MathUtils.lerp(botGroup.rotation.x, -targetLookY, 0.05);
+
+                // O corpo inclina ligeiramente com o movimento
+                botGroup.rotation.z = THREE.MathUtils.lerp(botGroup.rotation.z, -targetLookX * 0.2, 0.05);
+            }
+
+            // 2. Respiração e Flutuação (Idle Animation)
+            const floatAmp = state.isThinking ? 0.2 : 0.15;
+            const floatSpeed = state.isThinking ? 6 : 2;
+
+            botGroup.position.x = THREE.MathUtils.lerp(botGroup.position.x, basePosX, 0.05);
+            botGroup.position.y = THREE.MathUtils.lerp(
+                botGroup.position.y,
+                basePosY + Math.sin(time * floatSpeed) * floatAmp,
+                0.1
+            );
+
+            // 3. Transição de Cores
+            // Usamos uma mistura da cor alvo com uma leve oscilação para parecer energia viva
+            const pulseColor = state.targetColor.clone();
+            if (state.isThinking) pulseColor.lerp(new THREE.Color(0xffffff), Math.sin(time * 10) * 0.2 + 0.2); // Pisca branco quando pensa
+            cloudMat.color.lerp(pulseColor, 0.1);
+
+            // 4. Squash & Stretch (Corpo)
+            let currentScaleX = state.targetBodyScaleX;
+            let currentScaleY = state.targetBodyScaleY;
+
+            // Se estiver pensando, faz um movimento de "apertar e soltar" rapidinho
+            if (state.isThinking) {
+                currentScaleX += Math.sin(time * 15) * 0.05;
+                currentScaleY -= Math.sin(time * 15) * 0.05;
+            }
+
+            // Aplica respiração no scale geral
+            const breath = Math.sin(time * 2) * 0.02;
+            bodyGroup.scale.x = THREE.MathUtils.lerp(bodyGroup.scale.x, currentScaleX + breath, 0.1);
+            bodyGroup.scale.y = THREE.MathUtils.lerp(bodyGroup.scale.y, currentScaleY - breath, 0.1);
+            // Mantém volume constante (se estica Y, encolhe Z)
+            bodyGroup.scale.z = THREE.MathUtils.lerp(bodyGroup.scale.z, (2 - currentScaleY) + breath, 0.1);
+
+
+            // 5. Olhos (Piscada e Expressão)
+            const blinkScale = state.isBlinking ? 0.05 : state.targetEyeScaleY;
+
+            // Olho Esquerdo
+            eyeL.scale.y = THREE.MathUtils.lerp(eyeL.scale.y, blinkScale, 0.3);
+            eyeL.rotation.z = THREE.MathUtils.lerp(eyeL.rotation.z, state.targetEyeRotZ, 0.1);
+
+            // Olho Direito (Rotacionado ao contrário para simetria nas sobrancelhas imaginárias)
+            eyeR.scale.y = THREE.MathUtils.lerp(eyeR.scale.y, blinkScale, 0.3);
+            eyeR.rotation.z = THREE.MathUtils.lerp(eyeR.rotation.z, -state.targetEyeRotZ, 0.1);
+
+            // Posição Y (Sobe assustado, desce triste)
+            eyeGroupBase.position.y = THREE.MathUtils.lerp(eyeGroupBase.position.y, state.targetEyePosY, 0.1);
+
+            // Animação dos brilhos dentro do olho (dá uma sensação de profundidade e vida)
+            eyeGroupBase.children.forEach(eye => {
+                if (eye.children.length > 1) {
+                    eye.children[1].position.y = 0.15 + Math.sin(time * 3) * 0.02; // Brilho maior flutua
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Responsividade
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            updateLayout();
+        });
+
+
+        // --- 5. LÓGICA DA API GROQ (O CÉREBRO) ---
+        const systemPrompt = `Você é o Sky, um ser mágico de nuvem e energia. Responda de forma natural, amigável e fofa.
+REGRA DE OURO MÁXIMA: Ao final de TODA resposta sua, sem exceção, você deve anexar uma tag definindo sua emoção em relação ao que disse.
+Formato exato: [E:EMOCAO, I:INTENSIDADE]
+- Emoções válidas: JOY, SAD, ANGRY, SURPRISE, NEUTRAL.
+- Intensidade: Número decimal de 0.0 a 1.0 (ex: 0.5, 0.8, 1.0).
+Exemplo de resposta: "Nossa, que ideia fantástica! Vamos voar alto! [E:JOY, I:0.9]"
+Sempre responda em Português do Brasil.`;
+
+        let groqApiKey = '';
+        let chatHistory = [{ role: 'system', content: systemPrompt }];
+
+        // UI Elements
+        const apiKeyInput = document.getElementById('api-key-input');
+        const saveKeyBtn = document.getElementById('save-key-btn');
+        const statusIndicator = document.getElementById('status-indicator');
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+
+        // Configuração da API
+        saveKeyBtn.addEventListener('click', () => {
+            if (apiKeyInput.value.trim().length > 10) {
+                groqApiKey = apiKeyInput.value.trim();
+                statusIndicator.textContent = "Online";
+                statusIndicator.className = "text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded-full border border-green-500/30";
+                chatInput.disabled = false;
+                sendBtn.disabled = false;
+                apiKeyInput.value = '';
+                apiKeyInput.placeholder = 'Chave ativa! ••••••••••';
+
+                // Animação de sucesso no bot
+                setEmotion("JOY", 0.9);
+                setTimeout(() => setEmotion("NEUTRAL", 1), 2000);
+            }
+        });
+
+        function addUserMessage(text) {
+            const div = document.createElement('div');
+            div.className = 'flex items-start gap-3 flex-row-reverse msg-enter';
+            div.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0 shadow-inner">
+                    <i class="fa-solid fa-user text-xs text-slate-300"></i>
+                </div>
+                <div class="bg-blue-600/90 rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-[85%] shadow-md leading-relaxed text-white">
+                    ${text}
+                </div>
+            `;
+            chatMessages.appendChild(div);
+            scrollToBottom();
+        }
+
+        function addBotMessage(text, emotion = "NEUTRAL", intensity = 0.5) {
+            setEmotion(emotion, intensity);
+
+            const div = document.createElement('div');
+            div.className = 'flex items-start gap-3 msg-enter';
+
+            let icon = 'fa-cloud';
+            let color = 'from-blue-600 to-cyan-400';
+            if (emotion === 'JOY') { icon = 'fa-star'; color = 'from-pink-500 to-orange-400'; }
+            if (emotion === 'SAD') { icon = 'fa-droplet'; color = 'from-slate-600 to-blue-500'; }
+            if (emotion === 'ANGRY') { icon = 'fa-bolt'; color = 'from-red-600 to-orange-500'; }
+            if (emotion === 'SURPRISE') { icon = 'fa-meteor'; color = 'from-purple-600 to-pink-500'; }
+
+            div.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr ${color} flex items-center justify-center shrink-0 shadow-lg">
+                    <i class="fa-solid ${icon} text-xs text-white"></i>
+                </div>
+                <div class="bg-slate-800/80 rounded-2xl rounded-tl-sm px-4 py-3 text-sm max-w-[85%] border border-slate-700/50 shadow-sm leading-relaxed">
+                    ${text}
+                </div>
+            `;
+            chatMessages.appendChild(div);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Função de envio
+        async function sendMessageToGroq(text) {
+            addUserMessage(text);
+            chatInput.value = '';
+            chatInput.disabled = true;
+            sendBtn.disabled = true;
+
+            // Reação física de processamento
+            state.isThinking = true;
+            setEmotion("NEUTRAL", 1);
+
+            chatHistory.push({ role: "user", content: text });
+
+            try {
+                const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${groqApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: "llama-3.1-8b-instant",
+                        messages: chatHistory,
+                        temperature: 0.7,
+                        max_tokens: 200
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error?.message || "Erro de conexão astral.");
+                }
+
+                const data = await response.json();
+                let botText = data.choices[0].message.content;
+                chatHistory.push({ role: "assistant", content: botText });
+
+                // Parser Emocional Oculto
+                const regex = /\[E:([A-Z]+),\s*I:([0-9.]+)\]/i;
+                const match = botText.match(regex);
+
+                let emotion = "NEUTRAL";
+                let intensity = 0.5;
+
+                if (match) {
+                    emotion = match[1].toUpperCase();
+                    intensity = parseFloat(match[2]);
+                    botText = botText.replace(match[0], '').trim();
+                }
+
+                state.isThinking = false;
+                addBotMessage(botText, emotion, intensity);
+
+            } catch (error) {
+                state.isThinking = false;
+                addBotMessage(`Meus núcleos pifaram: ${error.message}`, "SAD", 1.0);
+            } finally {
+                chatInput.disabled = false;
+                sendBtn.disabled = false;
+                chatInput.focus();
+            }
+        }
+
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = chatInput.value.trim();
+            if (text && groqApiKey) {
+                sendMessageToGroq(text);
+            }
+        });
+
+        // Apresentação inicial
+        setTimeout(() => setEmotion("JOY", 0.6), 1500);
+        setTimeout(() => setEmotion("NEUTRAL", 1.0), 3000);
+
+    </script>
+</body>
+
+</html>
