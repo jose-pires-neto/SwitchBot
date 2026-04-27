@@ -57,15 +57,24 @@
             <!-- Botão ocultar (Electron) -->
             <button id="btnHidePet" class="hide-pet-btn" title="Ocultar (Alt+H)">✕</button>
 
-            <!-- Overlay flutuante: balão + botão chat -->
+            <!-- Overlay flutuante: Balões de Quadrinhos -->
             <div class="mascot-overlay" id="mascotWrapper">
+                
+                <!-- Balão de PENSAMENTO (Thought) -->
+                <div class="comic-bubble thought hidden" id="mascotThoughtBubble">
+                    <div class="bubble-content" id="thoughtText"></div>
+                    <div class="thought-dots"><span></span><span></span><span></span></div>
+                </div>
 
-                <!-- Balão de Diálogo (dinâmico, sem corte) -->
-                <div class="speech-bubble hidden" id="mascotSpeechBubble">
-                    <div class="speech-content" id="mascotText"></div>
+                <!-- Balão de FALA/AÇÃO (Speech) -->
+                <div class="comic-bubble speech hidden" id="mascotSpeechBubble">
+                    <div class="bubble-content" id="speechText">
+                        <div id="mascotText"></div> <!-- Mantido para compatibilidade -->
+                    </div>
                     <div class="typing-indicator hidden" id="mascotTyping">
                         <span></span><span></span><span></span>
                     </div>
+                    <div class="speech-tail"></div>
                 </div>
 
                 <!-- Botão abrir chat (fallback browser) -->
@@ -282,12 +291,39 @@
         }
         scheduleBlink();
 
-        // Mouse tracking
+        // Mouse Tracking com Restrições (Clamping) e Inatividade
         let mouseX = 0, mouseY = 0;
-        document.addEventListener('mousemove', e => {
-            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
-            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
-        });
+        let lastMouseX = 0, lastMouseY = 0;
+        let lastMoveTime = Date.now();
+        const IDLE_TIMEOUT = 3000; // 3 segundos parado = volta pro centro
+
+        if (window.electronAPI && window.electronAPI.onGlobalMouseMove) {
+            window.electronAPI.onGlobalMouseMove((data) => {
+                // Coordenadas -1 a 1
+                const nx = (data.x / data.windowWidth) * 2 - 1;
+                const ny = -(data.y / data.windowHeight) * 2 + 1;
+
+                // Detecta movimento significativo para resetar o timer
+                if (Math.abs(nx - lastMouseX) > 0.01 || Math.abs(ny - lastMouseY) > 0.01) {
+                    lastMoveTime = Date.now();
+                }
+
+                // Clamping: Limita o movimento para não "quebrar o pescoço"
+                // No X (lados): ±1.2 (cerca de 60 graus)
+                // No Y (cima/baixo): ±0.7 (cerca de 40 graus)
+                mouseX = Math.max(-1.2, Math.min(1.2, nx));
+                mouseY = Math.max(-0.7, Math.min(0.7, ny));
+
+                lastMouseX = nx;
+                lastMouseY = ny;
+            });
+        } else {
+            window.addEventListener('mousemove', (e) => {
+                lastMoveTime = Date.now();
+                mouseX = Math.max(-1.2, Math.min(1.2, (e.clientX / window.innerWidth) * 2 - 1));
+                mouseY = Math.max(-0.7, Math.min(0.7, -(e.clientY / window.innerHeight) * 2 + 1));
+            });
+        }
 
         // Posição base: no Electron a janela é dedicada ao mascote → centraliza
         // No browser, desloca para a esquerda para não sobrepor o chat
@@ -311,9 +347,15 @@
             const time = clock.getElapsedTime();
 
             if (!engineState.isThinking) {
-                botGroup.rotation.y = THREE.MathUtils.lerp(botGroup.rotation.y, mouseX * 0.5, 0.05);
-                botGroup.rotation.x = THREE.MathUtils.lerp(botGroup.rotation.x, -mouseY * 0.5, 0.05);
-                botGroup.rotation.z = THREE.MathUtils.lerp(botGroup.rotation.z, -mouseX * 0.1, 0.05);
+                // Lógica de inatividade: se parado, o alvo é 0 (centro)
+                const isIdle = (Date.now() - lastMoveTime) > IDLE_TIMEOUT;
+                const targetX = isIdle ? 0 : mouseX;
+                const targetY = isIdle ? 0 : mouseY;
+
+                // Rotação suave com limites aplicados
+                botGroup.rotation.y = THREE.MathUtils.lerp(botGroup.rotation.y, targetX * 0.5, 0.05);
+                botGroup.rotation.x = THREE.MathUtils.lerp(botGroup.rotation.x, -targetY * 0.5, 0.05);
+                botGroup.rotation.z = THREE.MathUtils.lerp(botGroup.rotation.z, -targetX * 0.1, 0.05);
             }
 
             const floatAmp   = engineState.isThinking ? 0.2 : 0.15;

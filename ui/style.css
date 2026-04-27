@@ -281,6 +281,98 @@ body.mascot-active .header {
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
+/* ======================== COMIC BUBBLES (Premium Comic Style) ======================== */
+.comic-bubble {
+    position: relative;
+    max-width: 280px;
+    background: rgba(15, 15, 25, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    padding: 16px 20px;
+    color: #fff;
+    font-size: 14px;
+    line-height: 1.5;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 
+                inset 0 0 20px rgba(255, 255, 255, 0.05);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    pointer-events: auto;
+    z-index: 100;
+}
+
+.comic-bubble.hidden {
+    opacity: 0;
+    transform: scale(0.8) translateY(20px);
+    pointer-events: none;
+}
+
+.bubble-content {
+    white-space: pre-wrap;
+    max-height: 150px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+/* ── Estilo FALA (Speech) ─────────────────────────────────────────── */
+.comic-bubble.speech {
+    border-radius: 24px 24px 24px 4px;
+}
+
+.speech-tail {
+    position: absolute;
+    bottom: -12px;
+    left: 20px;
+    width: 20px;
+    height: 20px;
+    background: rgba(15, 15, 25, 0.85);
+    border-right: 2px solid rgba(255, 255, 255, 0.15);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+    transform: rotate(45deg);
+    z-index: -1;
+}
+
+/* ── Estilo PENSAMENTO (Thought) ──────────────────────────────────── */
+.comic-bubble.thought {
+    border-radius: 30px;
+    border-style: solid; /* Pode ser dashed se quiser mais clássico */
+    background: rgba(25, 25, 40, 0.7);
+}
+
+.thought-dots {
+    position: absolute;
+    bottom: -25px;
+    left: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+}
+
+.thought-dots span {
+    background: rgba(25, 25, 40, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    display: block;
+}
+
+.thought-dots span:nth-child(1) { width: 12px; height: 12px; margin-left: 0; }
+.thought-dots span:nth-child(2) { width: 8px; height: 8px; margin-left: -5px; }
+.thought-dots span:nth-child(3) { width: 5px; height: 5px; margin-left: -10px; }
+
+/* ── Layout no Electron Pet ────────────────────────────────────────── */
+.electron-pet-mode .mascot-overlay {
+    left: 45%; /* Move o balão para o lado do mascote */
+    top: 30%;
+    transform: none;
+}
+
+.electron-pet-mode .comic-bubble {
+    max-width: 200px; /* Balões mais compactos no pet mode */
+}
 
 /* ======================== MASCOTE OVERLAY (posicionamento fixo) ======================== */
 .mascot-overlay {
