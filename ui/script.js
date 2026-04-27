@@ -46,8 +46,12 @@ const btnSave = document.getElementById('btnSaveSettings');
 
 let isProcessing = false;
 let currentExecutingCard = null;
-let currentMode = 'mascot'; // Começa super minimalista
+let currentMode = 'mascot';
 let mascotSpeechTimeout = null;
+
+// ── Detecção de modo Electron (Desktop Pet) ──────────────────────────
+const IS_ELECTRON = !!window.electronAPI;
+if (IS_ELECTRON) document.body.classList.add('electron-pet-mode');
 
 // Configurações Globais
 let pendingProvider = null;
@@ -62,6 +66,30 @@ async function init() {
     await loadCurrentConfig();
     applyMode();
     connectSSE();
+    setupElectron();
+}
+
+// ── Integração Electron ───────────────────────────────────────────────
+function setupElectron() {
+    if (!IS_ELECTRON) return;
+
+    // Input começa oculto — aparece via Alt+Space
+    const inputArea = document.getElementById('inputArea');
+    inputArea.style.display = 'none';
+
+    // Alt+Space → toggle input (enviado pelo main.js via IPC)
+    window.electronAPI.onToggleInput(() => {
+        const visible = inputArea.style.display !== 'none';
+        inputArea.style.display = visible ? 'none' : 'flex';
+        if (!visible) input.focus();
+    });
+
+    // Botão ✕ oculta a janela
+    const btnHide = document.getElementById('btnHidePet');
+    if (btnHide) btnHide.addEventListener('click', () => window.electronAPI.hideWindow());
+
+    // Esconde o botão "Abrir Chat" — em pet mode o chat fica oculto
+    if (mBtnChat) mBtnChat.style.display = 'none';
 }
 
 async function loadCurrentConfig() {

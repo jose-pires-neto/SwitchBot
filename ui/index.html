@@ -51,6 +51,12 @@
         <!-- ======================== MODO MASCOTE ======================== -->
         <div id="mascotView" class="view-mode mascot-mode">
 
+            <!-- Região de arrastar a janela (cobre o mascote, apenas no modo Electron) -->
+            <div id="petDragRegion" class="pet-drag-region"></div>
+
+            <!-- Botão ocultar (Electron) -->
+            <button id="btnHidePet" class="hide-pet-btn" title="Ocultar (Alt+H)">✕</button>
+
             <!-- Overlay flutuante: balão + botão chat -->
             <div class="mascot-overlay" id="mascotWrapper">
 
@@ -62,7 +68,7 @@
                     </div>
                 </div>
 
-                <!-- Botão abrir chat -->
+                <!-- Botão abrir chat (fallback browser) -->
                 <button class="m-btn-chat" id="mBtnChat" title="Abrir Chat">💬 Abrir Chat</button>
             </div>
 
@@ -283,11 +289,18 @@
             mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
         });
 
-        // Posição base: esquerda no desktop, centro no mobile
+        // Posição base: no Electron a janela é dedicada ao mascote → centraliza
+        // No browser, desloca para a esquerda para não sobrepor o chat
+        const isElectron = !!window.electronAPI;
         let basePosX = 0, basePosY = 0;
         function updateLayout() {
-            basePosX = window.innerWidth > 768 ? -2.2 : 0;
-            basePosY = window.innerWidth > 768 ? 0 : 2.2;
+            if (isElectron) {
+                basePosX = 0;
+                basePosY = 0;
+            } else {
+                basePosX = window.innerWidth > 768 ? -2.2 : 0;
+                basePosY = window.innerWidth > 768 ? 0 : 2.2;
+            }
         }
         updateLayout();
 
