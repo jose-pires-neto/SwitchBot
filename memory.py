@@ -13,12 +13,19 @@ O JarvisCore usa isso para:
 """
 
 import os
+import sys
 import sqlite3
 import json
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'memory.db')
+def get_base_path():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+BASE_DIR = get_base_path()
+DB_PATH = os.path.join(BASE_DIR, 'memory.db')
 
 def _connect():
     """Retorna conexão SQLite com row_factory para dicts."""
