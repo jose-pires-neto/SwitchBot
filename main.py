@@ -28,7 +28,21 @@ app = Flask(__name__)
 core = JarvisCore()
 sse_queue = queue.Queue()
 
-UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui')
+# ======================== PATH RESOLUTION ========================
+def get_base_path():
+    if getattr(sys, 'frozen', False):
+        # Se estiver rodando como executável (PyInstaller)
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+BASE_DIR = get_base_path()
+UI_DIR = os.path.join(BASE_DIR, 'ui')
+
+# Para arquivos internos que o PyInstaller extrai em pasta temporária (se usarmos --add-data)
+def get_resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 @app.route('/')
 def index():

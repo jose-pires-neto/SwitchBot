@@ -16,8 +16,11 @@ const chatView = document.getElementById('chatView');
 // Mascot DOM
 const mascotWrapper = document.getElementById('mascotWrapper');
 const mBtnChat = document.getElementById('mBtnChat');
-const mascotSpeech = document.getElementById('mascotSpeechBubble');
+const mascotSpeechBubble = document.getElementById('mascotSpeechBubble');
+const mascotThoughtBubble = document.getElementById('mascotThoughtBubble');
 const mascotText = document.getElementById('mascotText');
+const speechText = document.getElementById('speechText');
+const thoughtText = document.getElementById('thoughtText');
 const mascotTyping = document.getElementById('mascotTyping');
 
 // Chat DOM
@@ -188,25 +191,31 @@ function setMascotState(state, text = '') {
 
     clearTimeout(mascotSpeechTimeout);
 
-    if (text === '...typing...') {
-        mascotSpeech.classList.remove('hidden');
-        mascotText.classList.add('hidden');
-        mascotTyping.classList.remove('hidden');
-    } else if (text) {
-        mascotSpeech.classList.remove('hidden');
-        mascotTyping.classList.add('hidden');
-        mascotText.classList.remove('hidden');
+    if (state === 'thinking') {
+        window.botEngine.setEmotion('NEUTRAL', 0.5, true);
+        
+        // Exibe balão de pensamento
+        mascotSpeechBubble.classList.add('hidden');
+        mascotThoughtBubble.classList.remove('hidden');
+        thoughtText.textContent = text || "Processando...";
+        return;
+    }
 
-        // Exibe o texto completo, sem corte
-        mascotText.textContent = text.replace(/<[^>]*>?/gm, '');
+    // Para outros estados (idle, executing, success, error)
+    mascotThoughtBubble.classList.add('hidden');
 
-        if (state === 'success' || state === 'error') {
-            mascotSpeechTimeout = setTimeout(() => {
-                mascotSpeech.classList.add('hidden');
-            }, 6000);
-        }
+    if (text) {
+        mascotSpeechBubble.classList.remove('hidden');
+        mascotText.textContent = text;
+        
+        // Auto-hide após tempo baseado no tamanho do texto (mínimo 3s)
+        if (mascotSpeechTimeout) clearTimeout(mascotSpeechTimeout);
+        const duration = Math.max(3000, text.length * 50);
+        mascotSpeechTimeout = setTimeout(() => {
+            mascotSpeechBubble.classList.add('hidden');
+        }, duration);
     } else {
-        mascotSpeech.classList.add('hidden');
+        mascotSpeechBubble.classList.add('hidden');
     }
 }
 

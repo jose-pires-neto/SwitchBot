@@ -1,37 +1,42 @@
-# === Segredos ===
+# === Segredos e Configurações ===
 .env
 .env.*
+config.json
 
-# === Python Cache ===
+# === Python ===
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-electron/
-memory.db-shm
-memory.db-wal
-
-# === Virtual Environment ===
 venv/
 .venv/
 env/
 
-# === IDE ===
+# === PyInstaller & Builds ===
+build/
+dist/
+*.spec
+backend.exe
+
+# === Electron / Node ===
+node_modules/
+electron/node_modules/
+electron/dist/
+
+# === Banco de Dados (Persistência Local) ===
+memory.db
+memory.db-shm
+memory.db-wal
+
+# === IDE & OS ===
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# === OS ===
 Thumbs.db
 .DS_Store
 desktop.ini
 
-memory.db
-
-# === Skills geradas dinamicamente (opcionais) ===
-# Descomente a linha abaixo se quiser ignorar skills criadas pelo agente
-# skills/*.py
-# !skills/shell_executor.py
-# !skills/web_search.py
-# !skills/leitor_sites.py
+# === Skills ===
+# Garantimos que as skills de código sejam incluídas
+!skills/*.py

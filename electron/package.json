@@ -1,0 +1,39 @@
+{
+  "name": "switchbot-pet",
+  "version": "2.0.0",
+  "description": "SwitchBot Desktop Pet",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "build": {
+    "appId": "com.switchbot.pet",
+    "productName": "SwitchBot",
+    "win": {
+      "target": "portable",
+      "icon": null
+    },
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../ui",
+        "to": "ui",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../backend.exe",
+        "to": "backend.exe"
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "^29.4.6",
+    "electron-builder": "^24.13.3"
+  }
+}
